@@ -14,7 +14,6 @@ venv/
 # Build artifacts
 build/
 dist/
-*.spec
 
 # OS files
 .DS_Store
