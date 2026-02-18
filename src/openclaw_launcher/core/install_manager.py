@@ -40,6 +40,12 @@ class InstallManager:
     def _version_gte(cls, current: str, minimum: str) -> bool:
         return cls._parse_semver(current) >= cls._parse_semver(minimum)
 
+    @staticmethod
+    def _normalize_registry(registry: Optional[str]) -> str:
+        if not isinstance(registry, str):
+            return ""
+        return registry.strip()
+
     @classmethod
     def _get_best_installed_node_version(cls, rm: RuntimeManager):
         installed = rm.get_installed_versions(RuntimeManager.SOFTWARE_NODE)
@@ -147,7 +153,7 @@ class InstallManager:
             if instance_env:
                 env.update(instance_env)
 
-        npm_registry = Config.get_setting("npm_registry", "")
+        npm_registry = cls._normalize_registry(Config.get_setting("npm_registry", ""))
         if npm_registry:
             env["npm_config_registry"] = npm_registry
             env["NPM_CONFIG_REGISTRY"] = npm_registry
@@ -291,6 +297,22 @@ class InstallManager:
             kwargs["stderr"] = subprocess.STDOUT
 
         pnpm_runner = None
+        effective_args = list(args)
+
+        has_registry_arg = any(
+            arg == "--registry" or arg.startswith("--registry=")
+            for arg in effective_args
+        )
+        if not has_registry_arg:
+            registry = cls._normalize_registry(
+                env.get("pnpm_config_registry")
+                or env.get("PNPM_CONFIG_REGISTRY")
+                or env.get("npm_config_registry")
+                or env.get("NPM_CONFIG_REGISTRY")
+            )
+            if registry:
+                effective_args.append(f"--registry={registry}")
+
         try:
             pnpm_cmd = cls._find_runtime_tool(env, "pnpm")
             pnpm_runner = [pnpm_cmd]
@@ -316,7 +338,7 @@ class InstallManager:
             except FileNotFoundError:
                 pnpm_runner = [corepack_cmd, "pnpm"]
 
-        subprocess.run([*pnpm_runner, *args], **kwargs)
+        subprocess.run([*pnpm_runner, *effective_args], **kwargs)
 
         if log_stream is not None:
             log_stream.flush()
