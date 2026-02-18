@@ -66,11 +66,11 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             cd dist
             zip -r "../release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}.app.zip" "openclaw-launcher.app"
-          elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp "dist/openclaw-launcher.exe" "release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}.exe"
           else
-            cp "dist/openclaw-launcher" "release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}"
+            uv run python scripts/zip_release_asset.py
           fi
+        env:
+          MATRIX_PLATFORM: ${{ matrix.platform }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
