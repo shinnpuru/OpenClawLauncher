@@ -1,0 +1,26 @@
+[project]
+name = "openclaw-launcher"
+version = "0.1.0"
+description = "A PySide6 launcher for OpenClaw runtime installation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6.0",
+    "requests>=2.31.0",
+    "qt-material>=2.14",
+    "pyinstaller>=6.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.3.0",
+    "black",
+    "ruff"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openclaw_launcher"]

@@ -1,0 +1,90 @@
+name: Build and Release PyInstaller
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev --frozen
+
+      - name: Build executable with PyInstaller
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            uv run pyinstaller app-macos.spec
+          else
+            uv run pyinstaller app.spec
+          fi
+
+      - name: Prepare release asset
+        shell: bash
+        run: |
+          mkdir -p release
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            cd dist
+            zip -r "../release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}.app.zip" "openclaw-launcher.app"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            cp "dist/openclaw-launcher.exe" "release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}.exe"
+          else
+            cp "dist/openclaw-launcher" "release/openclaw-launcher-${{ github.ref_name }}-${{ matrix.platform }}"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release-assets/*
+          generate_release_notes: true
+          overwrite_files: true

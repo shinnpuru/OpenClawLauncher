@@ -1,0 +1,33 @@
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Tooling cache
+.pytest_cache/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# OS files
+.DS_Store
+
+# Launcher generated runtime/data
+logs/
+backups/
+instance/
+runtime/
+
+# Local config overrides
+*.local.json
+config.json
+
+# uv lock files
+*.lock
