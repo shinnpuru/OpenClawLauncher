@@ -38,7 +38,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --dev --frozen
+          if [ -f uv.lock ]; then
+            uv sync --dev --frozen
+          else
+            uv sync --dev
+          fi
 
       - name: Build executable with PyInstaller
         shell: bash
