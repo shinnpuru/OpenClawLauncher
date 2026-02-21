@@ -519,6 +519,31 @@ class InstallManager:
         logger.info(f"Building OpenClaw in {instance_path}")
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
         cls._run_pnpm(instance_path, ["build"], env, log_stream=log_stream)
+
+    @classmethod
+    def run_onboard_non_interactive(cls, instance_path: Path, instance_name: str, instance_port: int, log_stream: Optional[TextIO] = None):
+        """Run non-interactive onboarding after instance bootstrap."""
+        logger.info(f"Running non-interactive onboard in {instance_path}")
+        env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
+        node_cmd = cls._find_runtime_tool(env, "node")
+
+        kwargs = {
+            "cwd": instance_path,
+            "env": env,
+            "check": True,
+            "text": True,
+        }
+        if log_stream is not None:
+            kwargs["stdout"] = log_stream
+            kwargs["stderr"] = subprocess.STDOUT
+
+        subprocess.run([node_cmd, "openclaw.mjs", "onboard", "--non-interactive", "--accept-risk","--skip-skills","--skip-channels","--skip-health","--skip-daemon","--gateway-auth","token","--gateway-token",cls.get_instance_gateway_token(
+            instance_path,
+            instance_name,
+        ), "--gateway-port", str(instance_port)], **kwargs)
+
+        if log_stream is not None:
+            log_stream.flush()
         
     @classmethod
     def complete_install(cls, instance_name: str, instance_port: int = 18789, repo_url=None):
@@ -560,6 +585,7 @@ class InstallManager:
             cls.install_dependencies(target_path, instance_name, log_stream=log_file)
             cls.build_frontend(target_path, instance_name, log_stream=log_file)
             cls.build_backend(target_path, instance_name, log_stream=log_file)
+            cls.run_onboard_non_interactive(target_path, instance_name, instance_port, log_stream=log_file)
 
             log_file.write("===== Instance bootstrap completed =====\n")
             log_file.flush()
