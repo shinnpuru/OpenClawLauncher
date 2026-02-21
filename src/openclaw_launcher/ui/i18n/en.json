@@ -134,6 +134,7 @@
     "tag_default": "(Default)",
     "status_downloading": "Downloading {version}...",
     "msg_download_complete": "Download complete!",
+    "msg_download_busy": "Another download is already in progress. Please wait for it to finish.",
     "msg_download_failed": "Download failed: {error}",
     "msg_set_default_success": "Default version set to {version}",
     "msg_set_default_failed": "Failed to set default version: {error}",

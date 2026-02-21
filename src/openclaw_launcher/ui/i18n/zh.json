@@ -134,6 +134,7 @@
     "tag_default": "（默认）",
     "status_downloading": "正在下载 {version}...",
     "msg_download_complete": "下载完成!",
+    "msg_download_busy": "已有下载任务在进行中，请等待当前下载完成。",
     "msg_download_failed": "下载失败: {error}",
     "msg_set_default_success": "默认版本已设置为 {version}",
     "msg_set_default_failed": "设置默认版本失败: {error}",

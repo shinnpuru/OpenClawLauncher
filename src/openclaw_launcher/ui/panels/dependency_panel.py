@@ -9,7 +9,7 @@ from ...core.process_manager import ProcessManager
 from ..i18n import i18n
 
 class DownloadWorker(QThread):
-    finished = Signal()
+    completed = Signal()
     error = Signal(str)
     progress = Signal(int, int, str)
 
@@ -22,7 +22,7 @@ class DownloadWorker(QThread):
     def run(self):
         try:
             self.manager.install_version(self.software, self.version, callback=self._on_progress)
-            self.finished.emit()
+            self.completed.emit()
         except Exception as e:
             self.error.emit(str(e))
 
@@ -289,7 +289,7 @@ class DependencyPanel(QWidget):
 
     def start_download(self, software, version):
         if self.download_worker:
-            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_download_failed", error="Busy")) # Reuse or create specific msg
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_download_busy"))
             return
 
         self._current_download_software = software
@@ -309,7 +309,7 @@ class DependencyPanel(QWidget):
         
         self.download_worker = DownloadWorker(self.runtime_manager, software, version)
         self.download_worker.progress.connect(self.on_download_progress)
-        self.download_worker.finished.connect(self.on_download_finished)
+        self.download_worker.completed.connect(self.on_download_finished)
         self.download_worker.error.connect(self.on_download_error)
         self.download_worker.start()
         self.refresh_all_cards()

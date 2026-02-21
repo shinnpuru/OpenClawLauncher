@@ -185,7 +185,7 @@ class AdvancedPanel(QWidget):
 
     def load_settings(self):
         self.chk_minimize_tray.setChecked(Config.get_setting("minimize_to_tray", False))
-        self.chk_check_updates.setChecked(Config.get_setting("check_updates", False))
+        self.chk_check_updates.setChecked(Config.get_setting("check_updates", True))
         self.chk_keep_alive.setChecked(Config.get_setting("keep_alive", False))
         auto_start_checked = Config.get_setting("auto_start", False)
         if AutoStartManager.is_supported():

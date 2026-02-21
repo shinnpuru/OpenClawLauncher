@@ -387,7 +387,7 @@ class InstallManager:
         return env
 
     @classmethod
-    def get_instance_port(cls, instance_path: Path, default_port: int = 3000) -> int:
+    def get_instance_port(cls, instance_path: Path, default_port: int = 18789) -> int:
         """Read instance port from .env.local, falling back to default when missing/invalid."""
         env_file = instance_path / ".env.local"
         if not env_file.exists():
@@ -434,7 +434,7 @@ class InstallManager:
         cls._run_pnpm(instance_path, ["build"], env, log_stream=log_stream)
         
     @classmethod
-    def complete_install(cls, instance_name: str, instance_port: int = 3000, repo_url=None):
+    def complete_install(cls, instance_name: str, instance_port: int = 18789, repo_url=None):
         """
         Creates a new instance by copying from the cached OpenClaw runtime.
         """

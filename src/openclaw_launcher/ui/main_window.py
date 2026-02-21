@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._check_openclaw_updates_on_startup)
 
     def _check_openclaw_updates_on_startup(self):
-        if not Config.get_setting("check_updates", False):
+        if not Config.get_setting("check_updates", True):
             return
 
         if self._update_check_worker and self._update_check_worker.isRunning():

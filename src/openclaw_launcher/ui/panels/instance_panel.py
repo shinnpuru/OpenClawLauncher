@@ -151,7 +151,7 @@ class InstancePanel(QWidget):
             self,
             i18n.t("dialog_new_instance"),
             i18n.t("dialog_enter_port"),
-            3000,
+            18789,
             1,
             65535,
             1,
