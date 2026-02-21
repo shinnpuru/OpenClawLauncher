@@ -74,6 +74,8 @@
     "desc_check_updates": "启用后在面板中提示可用的版本更新",
     "lbl_keep_alive": "退出时保留实例运行状态",
     "desc_keep_alive": "启用后关闭应用时记录运行中的实例",
+    "lbl_windows_patch": "Windows 支持补丁",
+    "desc_windows_patch": "安装依赖前写入 A2UI 占位包（仅 Windows）",
     "lbl_auto_start": "开机自启动",
     "desc_auto_start": "开启后系统启动时自动运行 OpenClaw Launcher",
     "msg_auto_start_failed": "设置开机自启动失败: {error}",

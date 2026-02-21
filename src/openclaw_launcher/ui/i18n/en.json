@@ -74,6 +74,8 @@
     "desc_check_updates": "Notify when updates are available",
     "lbl_keep_alive": "Keep Instances Running on Exit",
     "desc_keep_alive": "Instances will continue running after launcher is closed",
+    "lbl_windows_patch": "Windows A2UI Patch",
+    "desc_windows_patch": "Apply an A2UI placeholder bundle before installing dependencies (Windows only)",
     "lbl_auto_start": "Auto-start at Boot",
     "desc_auto_start": "Launch OpenClaw Launcher on system startup",
     "msg_auto_start_failed": "Failed to set auto-start: {error}",

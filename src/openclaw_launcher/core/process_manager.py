@@ -27,6 +27,7 @@ class ProcessManager:
             "NPM_CONFIG_REGISTRY",
             "pnpm_config_registry",
             "PNPM_CONFIG_REGISTRY",
+            "COREPACK_NPM_REGISTRY",
             "NODEJS_ORG_MIRROR",
             "NVM_NODEJS_ORG_MIRROR",
             "COREPACK_ENABLE_DOWNLOAD_PROMPT",

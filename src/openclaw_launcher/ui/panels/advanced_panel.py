@@ -60,6 +60,18 @@ class AdvancedPanel(QWidget):
         self.layout_general.addWidget(self.chk_keep_alive)
         self.layout_general.addWidget(self.lbl_keep_alive_desc)
         self.layout_general.addSpacing(10)
+
+        # Windows A2UI Patch
+        self.lbl_windows_patch = QLabel()
+        self.chk_windows_patch = QCheckBox()
+        self.lbl_windows_patch_desc = QLabel()
+        self.lbl_windows_patch_desc.setStyleSheet("color: gray; font-size: 11px;")
+        self.lbl_windows_patch_desc.setWordWrap(True)
+
+        self.layout_general.addWidget(self.lbl_windows_patch)
+        self.layout_general.addWidget(self.chk_windows_patch)
+        self.layout_general.addWidget(self.lbl_windows_patch_desc)
+        self.layout_general.addSpacing(10)
         
         # Auto Start
         self.lbl_auto_start = QLabel()
@@ -173,6 +185,7 @@ class AdvancedPanel(QWidget):
         self.chk_minimize_tray.stateChanged.connect(lambda: self.save_general("minimize_to_tray", self.chk_minimize_tray.isChecked()))
         self.chk_check_updates.stateChanged.connect(lambda: self.save_general("check_updates", self.chk_check_updates.isChecked()))
         self.chk_keep_alive.stateChanged.connect(lambda: self.save_general("keep_alive", self.chk_keep_alive.isChecked()))
+        self.chk_windows_patch.stateChanged.connect(lambda: self.save_general("windows_a2ui_patch", self.chk_windows_patch.isChecked()))
         self.chk_auto_start.stateChanged.connect(self.on_auto_start_changed)
 
         # Connect Troubleshoot Actions
@@ -187,6 +200,7 @@ class AdvancedPanel(QWidget):
         self.chk_minimize_tray.setChecked(Config.get_setting("minimize_to_tray", False))
         self.chk_check_updates.setChecked(Config.get_setting("check_updates", True))
         self.chk_keep_alive.setChecked(Config.get_setting("keep_alive", False))
+        self.chk_windows_patch.setChecked(Config.get_setting("windows_a2ui_patch", True))
         auto_start_checked = Config.get_setting("auto_start", False)
         if AutoStartManager.is_supported():
             try:
@@ -213,6 +227,10 @@ class AdvancedPanel(QWidget):
         self.lbl_keep_alive.setText(i18n.t("lbl_keep_alive"))
         self.chk_keep_alive.setText(i18n.t("opt_enabled"))
         self.lbl_keep_alive_desc.setText(i18n.t("desc_keep_alive"))
+
+        self.lbl_windows_patch.setText(i18n.t("lbl_windows_patch"))
+        self.chk_windows_patch.setText(i18n.t("opt_enabled"))
+        self.lbl_windows_patch_desc.setText(i18n.t("desc_windows_patch"))
 
         self.lbl_auto_start.setText(i18n.t("lbl_auto_start"))
         self.chk_auto_start.setText(i18n.t("opt_enabled"))

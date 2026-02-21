@@ -159,6 +159,7 @@ class InstallManager:
             env["NPM_CONFIG_REGISTRY"] = npm_registry
             env["pnpm_config_registry"] = npm_registry
             env["PNPM_CONFIG_REGISTRY"] = npm_registry
+            env["COREPACK_NPM_REGISTRY"] = npm_registry
 
         node_mirror = Config.get_setting("node_mirror", "")
         if isinstance(node_mirror, str):
@@ -420,6 +421,90 @@ class InstallManager:
         cls._run_pnpm(instance_path, ["install"], env, log_stream=log_stream)
 
     @classmethod
+    def apply_windows_a2ui_patch(cls, instance_path: Path, log_stream: Optional[TextIO] = None):
+        """Apply the Windows A2UI placeholder bundle patch before installing deps."""
+        if os.name != "nt":
+            return
+
+        script_dir = instance_path / "scripts"
+        script_dir.mkdir(parents=True, exist_ok=True)
+        script_path = script_dir / "bundle-a2ui.mjs"
+
+        placeholder_content = "\n".join(
+            [
+                "// scripts/bundle-a2ui.mjs",
+                "// OpenClaw A2UI Bundle Placeholder Generator",
+                "// For public repository users who do not have access to private A2UI source code.",
+                "// This script creates a minimal valid ES module to satisfy TypeScript compilation.",
+                "",
+                "import fs from 'node:fs';",
+                "import path from 'node:path';",
+                "import { createHash } from 'node:crypto';",
+                "import { fileURLToPath } from 'node:url';",
+                "",
+                "// Resolve project root directory correctly on Windows and Unix.",
+                "const __filename = fileURLToPath(import.meta.url);",
+                "const __dirname = path.dirname(__filename);",
+                "const ROOT_DIR = path.resolve(__dirname, '..'); // openclaw/ root",
+                "",
+                "// Define output paths.",
+                "const OUTPUT_DIR = path.join(ROOT_DIR, 'src', 'canvas-host', 'a2ui');",
+                "const OUTPUT_FILE = path.join(OUTPUT_DIR, 'a2ui.bundle.js');",
+                "const HASH_FILE = path.join(OUTPUT_DIR, '.bundle.hash');",
+                "",
+                "// Ensure output directory exists.",
+                "fs.mkdirSync(OUTPUT_DIR, { recursive: true });",
+                "",
+                "// Generate placeholder content (valid ES module).",
+                "const placeholderContent = `",
+                "// Auto-generated placeholder for A2UI",
+                "// Source code is not available in the public OpenClaw repository.",
+                "// This file exists only to satisfy build dependencies.",
+                "export const A2UI = {",
+                "  version: '0.0.0-placeholder',",
+                "  render: () => {",
+                "    throw new Error('A2UI runtime is not available in this build.');",
+                "  }",
+                "};",
+                "`.trim() + '\\n';",
+                "",
+                "// Write the bundle file.",
+                "fs.writeFileSync(OUTPUT_FILE, placeholderContent);",
+                "",
+                "// Compute and write hash to prevent unnecessary rebuilds.",
+                "const hash = createHash('sha256').update(placeholderContent).digest('hex');",
+                "fs.writeFileSync(HASH_FILE, hash);",
+                "",
+                "// Success message.",
+                "console.log('A2UI placeholder bundle created successfully.');",
+                "console.log(`   Bundle: ${OUTPUT_FILE}`);",
+                "console.log(`   Hash:   ${HASH_FILE}`);",
+                "",
+            ]
+        )
+
+        script_path.write_text(placeholder_content, encoding="utf-8")
+
+        package_json = instance_path / "package.json"
+        if package_json.exists():
+            try:
+                package_data = json.loads(package_json.read_text(encoding="utf-8"))
+                scripts = package_data.get("scripts")
+                if not isinstance(scripts, dict):
+                    scripts = {}
+                    package_data["scripts"] = scripts
+                desired = "node --import tsx scripts/bundle-a2ui.mjs"
+                if scripts.get("canvas:a2ui:bundle") != desired:
+                    scripts["canvas:a2ui:bundle"] = desired
+                    package_json.write_text(json.dumps(package_data, indent=2) + "\n", encoding="utf-8")
+            except Exception as exc:
+                raise RuntimeError(f"Failed to apply A2UI patch: {exc}") from exc
+
+        if log_stream is not None:
+            log_stream.write("Applied Windows A2UI placeholder patch.\n")
+            log_stream.flush()
+
+    @classmethod
     def build_frontend(cls, instance_path: Path, instance_name: str, log_stream: Optional[TextIO] = None):
         """Build the UI components."""
         logger.info(f"Building UI in {instance_path}")
@@ -466,6 +551,9 @@ class InstallManager:
 
             cls.ensure_node_runtime(target_path)
             cls.setup_instance_environment(target_path, instance_name, instance_port=instance_port)
+
+            if Config.get_setting("windows_a2ui_patch", False):
+                cls.apply_windows_a2ui_patch(target_path, log_stream=log_file)
 
             cls.install_dependencies(target_path, instance_name, log_stream=log_file)
             cls.build_frontend(target_path, instance_name, log_stream=log_file)
