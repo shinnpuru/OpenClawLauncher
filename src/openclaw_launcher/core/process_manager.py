@@ -37,7 +37,7 @@ class ProcessManager:
         return key in managed_keys or key.startswith("OPENCLAW_") or key.startswith("CLAWDBOT_")
 
     @classmethod
-    def _ensure_cli_openclaw_shim(cls, instance_name: str, instance_path: Path) -> Path:
+    def _ensure_cli_openclaw_shim(cls, instance_name: str, instance_path: Path, node_cmd: str) -> Path:
         script_dir = Config.LOGS_DIR / "_cli_scripts"
         shim_dir = script_dir / "_bin"
         shim_dir.mkdir(parents=True, exist_ok=True)
@@ -49,7 +49,7 @@ class ProcessManager:
                 "@echo off",
                 "setlocal",
                 f'cd /d "{instance_path}"',
-                "node openclaw.mjs %*",
+                f'"{node_cmd}" openclaw.mjs %*',
                 "exit /b %errorlevel%",
             ]
             shim_path.write_text("\r\n".join(shim_lines) + "\r\n", encoding="utf-8")
@@ -68,7 +68,7 @@ class ProcessManager:
             "#!/usr/bin/env bash",
             "set +e",
             f"cd {shlex.quote(str(instance_path))} || exit 1",
-            "exec node openclaw.mjs \"$@\"",
+            f"exec {shlex.quote(node_cmd)} openclaw.mjs \"$@\"",
         ]
         shim_path.write_text("\n".join(shim_lines) + "\n", encoding="utf-8")
         shim_path.chmod(shim_path.stat().st_mode | 0o111)
@@ -88,7 +88,8 @@ class ProcessManager:
     def _build_cli_script(cls, instance_name: str, instance_path: Path, env: dict) -> Path:
         script_dir = Config.LOGS_DIR / "_cli_scripts"
         script_dir.mkdir(parents=True, exist_ok=True)
-        cli_shim_dir = cls._ensure_cli_openclaw_shim(instance_name, instance_path)
+        node_cmd = InstallManager.resolve_runtime_tool(env, "node")
+        cli_shim_dir = cls._ensure_cli_openclaw_shim(instance_name, instance_path, node_cmd)
         env["PATH"] = f"{cli_shim_dir}{os.pathsep}{env.get('PATH', '')}"
 
         safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in instance_name)
@@ -187,9 +188,16 @@ class ProcessManager:
         env = InstallManager.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
         instance_port = InstallManager.get_instance_port(instance_path)
 
-        command = ["openclaw", "gateway", "--port", str(instance_port), "--verbose", "--allow-unconfigured"]
-        if shutil.which("openclaw", path=env.get("PATH", "")) is None:
-            command = ["node", "openclaw.mjs", "gateway", "--port", str(instance_port), "--verbose", "--allow-unconfigured"]
+        node_cmd = InstallManager.resolve_runtime_tool(env, "node")
+        command = [
+            node_cmd,
+            "openclaw.mjs",
+            "gateway",
+            "--port",
+            str(instance_port),
+            "--verbose",
+            "--allow-unconfigured",
+        ]
 
         log_file.write("\n===== Instance runtime started =====\n")
         log_file.write(f"cwd: {instance_path}\n")

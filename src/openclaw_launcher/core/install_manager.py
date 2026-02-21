@@ -260,7 +260,7 @@ class InstallManager:
 
     @classmethod
     def _find_runtime_tool(cls, env: dict, tool_name: str) -> str:
-        """Resolve runtime Node tool path, preferring runtime binaries over system ones."""
+        """Resolve runtime Node tool path from configured runtime binaries only."""
         runtime_bin = env.get("OPENCLAW_RUNTIME_NODE_BIN", "").strip()
         candidates = []
 
@@ -279,11 +279,13 @@ class InstallManager:
             if candidate.exists() and candidate.is_file():
                 return str(candidate)
 
-        fallback = shutil.which(tool_name, path=env.get("PATH", ""))
-        if fallback:
-            return fallback
+        raise FileNotFoundError(
+            f"{tool_name} not found in configured runtime Node environment"
+        )
 
-        raise FileNotFoundError(f"{tool_name} not found in runtime environment")
+    @classmethod
+    def resolve_runtime_tool(cls, env: dict, tool_name: str) -> str:
+        return cls._find_runtime_tool(env, tool_name)
 
     @classmethod
     def _run_pnpm(cls, instance_path: Path, args: list[str], env: dict, log_stream: Optional[TextIO] = None):
