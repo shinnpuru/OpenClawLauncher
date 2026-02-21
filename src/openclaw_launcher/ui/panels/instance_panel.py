@@ -33,10 +33,6 @@ class InstancePanel(QWidget):
         super().__init__()
         self.layout = QVBoxLayout(self)
         
-        # Header
-        self.header_label = QLabel(i18n.t("header_clean_launcher"))
-        self.layout.addWidget(self.header_label)
-        
         # Instance List
         self.instance_list = QListWidget()
         self.layout.addWidget(self.instance_list)
@@ -65,7 +61,6 @@ class InstancePanel(QWidget):
         self.refresh_instances()
 
     def update_ui_texts(self):
-        self.header_label.setText(i18n.t("header_clean_launcher"))
         self.btn_create.setText(i18n.t("btn_create_instance"))
         self.btn_refresh.setText(i18n.t("btn_refresh"))
         self.refresh_instances()

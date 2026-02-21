@@ -75,7 +75,7 @@ class PluginInstallWorker(QThread):
 class PluginPanel(QWidget):
     RECOMMENDED_PLUGINS = [
         {
-            "name": "@m1heng/clawdbot-feishu",
+            "name": "@m1heng-clawd/feishu",
             "url": "https://github.com/m1heng/clawdbot-feishu",
         },
         {
@@ -96,8 +96,12 @@ class PluginPanel(QWidget):
         instance_row.addWidget(self.instance_label)
 
         self.instance_selector = QComboBox()
-        self.instance_selector.currentIndexChanged.connect(self.refresh_plugins)
+        self.instance_selector.currentIndexChanged.connect(self._on_instance_changed)
         instance_row.addWidget(self.instance_selector)
+
+        self.btn_refresh = QPushButton(i18n.t("btn_refresh"))
+        self.btn_refresh.clicked.connect(self.refresh_plugins)
+        instance_row.addWidget(self.btn_refresh)
         self.layout.addLayout(instance_row)
 
         self.plugin_tree = QTreeWidget()
@@ -120,10 +124,6 @@ class PluginPanel(QWidget):
         self.btn_install = QPushButton(i18n.t("btn_install_plugin"))
         self.btn_install.clicked.connect(self.install_from_input)
         install_row.addWidget(self.btn_install)
-
-        self.btn_refresh = QPushButton(i18n.t("btn_refresh"))
-        self.btn_refresh.clicked.connect(self.refresh_plugins)
-        install_row.addWidget(self.btn_refresh)
 
         self.layout.addLayout(install_row)
 
@@ -154,6 +154,7 @@ class PluginPanel(QWidget):
             btn_install.clicked.connect(
                 lambda checked=False, package_name=plugin["name"]: self.start_install(package_name)
             )
+            btn_install.setEnabled(self._has_selected_instance())
             row_layout.addWidget(btn_install)
             self.recommended_install_buttons.append(btn_install)
 
@@ -187,6 +188,20 @@ class PluginPanel(QWidget):
                 self.instance_selector.setCurrentIndex(idx)
 
         self.instance_selector.blockSignals(False)
+        self._update_install_controls_state()
+
+    def _on_instance_changed(self):
+        self._update_install_controls_state()
+        self.refresh_plugins()
+
+    def _has_selected_instance(self) -> bool:
+        return bool(self.instance_selector.currentData())
+
+    def _update_install_controls_state(self):
+        enable_install = self._has_selected_instance() and self.install_worker is None
+        self.btn_install.setEnabled(enable_install)
+        for button in self.recommended_install_buttons:
+            button.setEnabled(enable_install)
 
     def _get_selected_instance_path(self) -> Path | None:
         instance_name = self.instance_selector.currentData()
@@ -348,11 +363,11 @@ class PluginPanel(QWidget):
         )
 
     def _set_installing_state(self, installing: bool):
-        self.btn_install.setEnabled(not installing)
+        self.btn_install.setEnabled((not installing) and self._has_selected_instance())
         self.btn_refresh.setEnabled(not installing)
         self.instance_selector.setEnabled(not installing)
         for button in self.recommended_install_buttons:
-            button.setEnabled(not installing)
+            button.setEnabled((not installing) and self._has_selected_instance())
 
     def update_ui_texts(self):
         self.instance_label.setText(i18n.t("lbl_select_instance"))
