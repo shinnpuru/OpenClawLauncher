@@ -4,6 +4,9 @@ from PySide6.QtCore import QTimer, QFileSystemWatcher
 from ...core.config import Config
 from ...core.process_manager import ProcessManager
 from ..i18n import i18n
+import subprocess
+import os
+from pathlib import Path
 
 class LogPanel(QWidget):
     def __init__(self):
@@ -22,9 +25,9 @@ class LogPanel(QWidget):
         self.layout.addWidget(self.log_display)
         
         btn_layout = QHBoxLayout()
-        self.btn_refresh = QPushButton(i18n.t("btn_refresh_logs"))
-        self.btn_refresh.clicked.connect(self.load_log)
-        btn_layout.addWidget(self.btn_refresh)
+        self.btn_open = QPushButton(i18n.t("btn_open_logs"))
+        self.btn_open.clicked.connect(self.open_log_file)
+        btn_layout.addWidget(self.btn_open)
         
         self.btn_clear = QPushButton(i18n.t("btn_clear_logs"))
         self.btn_clear.clicked.connect(self.clear_logs)
@@ -61,7 +64,7 @@ class LogPanel(QWidget):
         self._update_log_watch_target()
 
     def update_ui_texts(self):
-        self.btn_refresh.setText(i18n.t("btn_refresh_logs"))
+        self.btn_open.setText(i18n.t("btn_open_logs"))
         self.btn_clear.setText(i18n.t("btn_clear_logs"))
 
     def refresh_instances(self):
@@ -88,7 +91,10 @@ class LogPanel(QWidget):
         if log_path.exists():
             try:
                 with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
+                    lines = f.readlines()
+                    # Only show the last 100 lines
+                    last_100_lines = lines[-100:] if len(lines) > 100 else lines
+                    content = ''.join(last_100_lines)
                     self.log_display.setPlainText(content)
                     self.log_display.verticalScrollBar().setValue(
                         self.log_display.verticalScrollBar().maximum()
@@ -107,6 +113,21 @@ class LogPanel(QWidget):
             with open(log_path, 'w') as f:
                 f.write("")
         self.load_log()
+
+    def open_log_file(self):
+        """Open the log file with the system's default application"""
+        instance_name = self.instance_combo.currentText()
+        if not instance_name:
+            return
+        
+        log_path = Config.get_log_file(instance_name)
+        if log_path.exists():
+            if os.name == 'nt':  # Windows
+                os.startfile(str(log_path))
+            else:  # Linux/Mac
+                subprocess.run(['open' if os.uname().sysname == 'Darwin' else 'xdg-open', str(log_path)])
+        else:
+            self.log_display.setPlainText(i18n.t("msg_no_logs_found"))
 
     def shutdown(self):
         if self.refresh_timer.isActive():
