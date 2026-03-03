@@ -6,7 +6,9 @@ import shutil
 import tarfile
 import zipfile
 import urllib.request
+import urllib.parse
 import ssl
+import sys
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -390,7 +392,7 @@ class RuntimeManager:
     def _extract_archive(self, archive_path: Path, dest_dir: Path):
         logger.info(f"Extracting {archive_path} to {dest_dir}")
         temp_extract = dest_dir / "_temp_extract"
-        temp_extract.mkdir(exist_ok=True)
+        temp_extract.mkdir(parents=True, exist_ok=True)
         
         try:
             if str(archive_path).endswith("tar.gz") or str(archive_path).endswith("tgz"):
@@ -400,15 +402,38 @@ class RuntimeManager:
                 with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                     zip_ref.extractall(temp_extract)
             
-            # Flatten logic
+            # Flatten logic with safe copy to handle long paths and cross-device moves
+            def _safe_move(src: Path, dst_dir: Path):
+                dst = dst_dir / src.name
+                # Ensure destination parent exists
+                dst.parent.mkdir(parents=True, exist_ok=True)
+
+                try:
+                    if src.is_dir():
+                        # Use copytree with dirs_exist_ok to merge/overwrite if needed
+                        shutil.copytree(src, dst, dirs_exist_ok=True)
+                        try:
+                            shutil.rmtree(src)
+                        except Exception:
+                            pass
+                    else:
+                        shutil.copy2(src, dst)
+                        try:
+                            src.unlink()
+                        except Exception:
+                            pass
+                except Exception:
+                    # Surface the error so caller can handle/report it
+                    raise
+
             items = list(temp_extract.iterdir())
             if len(items) == 1 and items[0].is_dir():
                 source = items[0]
                 for item in source.iterdir():
-                    shutil.move(str(item), str(dest_dir))
+                    _safe_move(item, dest_dir)
             else:
-                 for item in temp_extract.iterdir():
-                    shutil.move(str(item), str(dest_dir))
+                for item in temp_extract.iterdir():
+                    _safe_move(item, dest_dir)
                     
         finally:
             if temp_extract.exists():

@@ -293,7 +293,8 @@ class AdvancedPanel(QWidget):
     
     def save_source(self, key, value):
         Config.set_setting(key, value)
-        QMessageBox.information(self, i18n.t("title_success"), i18n.t("msg_saved_setting", key=key))
+        message = i18n.t("msg_saved_setting").format(key=key)
+        QMessageBox.information(self, i18n.t("title_success"), message)
 
     def execute_clear_dependencies(self):
         reply = QMessageBox.question(
