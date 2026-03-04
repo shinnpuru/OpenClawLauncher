@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                               QListWidget, QListWidgetItem, QLabel, QInputDialog, QMessageBox)
+                               QListWidget, QListWidgetItem, QLabel, QInputDialog, QMessageBox, QProgressBar)
 from PySide6.QtCore import Qt, QTimer, QThread, Signal, Slot, QUrl
 from PySide6.QtGui import QDesktopServices
 from urllib.parse import urlencode
@@ -34,6 +34,7 @@ class InstanceCreateWorker(QThread):
 class InstanceUpdateWorker(QThread):
     finished = Signal(str)
     error = Signal(str)
+    progress = Signal(str, int, int, str)
 
     def __init__(self, name):
         super().__init__()
@@ -41,7 +42,13 @@ class InstanceUpdateWorker(QThread):
 
     def run(self):
         try:
-            new_name = InstallManager.update_instance_to_default_version(self.name)
+            def _progress_callback(stage, current, total, detail):
+                self.progress.emit(stage, current, total, detail)
+
+            new_name = InstallManager.update_instance_to_default_version(
+                self.name,
+                progress_callback=_progress_callback,
+            )
             self.finished.emit(new_name)
         except Exception as e:
             self.error.emit(str(e))
@@ -71,6 +78,11 @@ class InstancePanel(QWidget):
         # Status
         self.status_label = QLabel(i18n.t("status_ready"))
         self.layout.addWidget(self.status_label)
+
+        self.update_progress = QProgressBar()
+        self.update_progress.setVisible(False)
+        self.update_progress.setTextVisible(True)
+        self.layout.addWidget(self.update_progress)
         
         # Refresh logic
         self.refresh_timer = QTimer()
@@ -211,11 +223,39 @@ class InstancePanel(QWidget):
 
         self.status_label.setText(i18n.t("msg_updating_instance", name=name))
         self.btn_create.setEnabled(False)
+        self.update_progress.setVisible(True)
+        self.update_progress.setRange(0, 0)
+        self.update_progress.setFormat(i18n.t("progress_update_preparing"))
 
         self.worker = InstanceUpdateWorker(name)
         self.worker.finished.connect(lambda new_name: self.on_update_finished(name, new_name))
         self.worker.error.connect(lambda msg: self.on_update_error(name, msg))
+        self.worker.progress.connect(self.on_update_progress)
         self.worker.start()
+
+    def on_update_progress(self, stage, current, total, detail):
+        if stage == "bootstrap":
+            self.update_progress.setRange(0, 0)
+            self.update_progress.setFormat(i18n.t("progress_update_preparing"))
+            return
+
+        if stage == "migration":
+            if total <= 0:
+                self.update_progress.setRange(0, 0)
+                self.update_progress.setFormat(i18n.t("progress_update_migrating"))
+            else:
+                self.update_progress.setRange(0, total)
+                self.update_progress.setValue(current)
+                self.update_progress.setFormat(i18n.t("progress_update_fraction", current=current, total=total))
+
+            if detail:
+                self.status_label.setText(i18n.t("msg_update_migrating_step", item=detail, current=current, total=total))
+            return
+
+        if stage == "done":
+            self.update_progress.setRange(0, 1)
+            self.update_progress.setValue(1)
+            self.update_progress.setFormat(i18n.t("progress_update_done"))
 
     def _get_missing_dependencies(self):
         missing = []
@@ -246,6 +286,7 @@ class InstancePanel(QWidget):
 
     def on_update_finished(self, name, new_name):
         self.status_label.setText(i18n.t("msg_update_success", name=name, new_name=new_name))
+        self.update_progress.setVisible(False)
         self.refresh_instances()
         self.btn_create.setEnabled(True)
         self.worker = None
@@ -253,6 +294,7 @@ class InstancePanel(QWidget):
     def on_update_error(self, name, error_msg):
         QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_update_error", name=name, error=error_msg))
         self.status_label.setText(i18n.t("msg_update_failed", name=name))
+        self.update_progress.setVisible(False)
         self.btn_create.setEnabled(True)
         self.worker = None
 

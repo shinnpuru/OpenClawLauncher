@@ -7,7 +7,7 @@ import json
 import re
 import secrets
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Optional, TextIO, Callable
 from .config import Config
 from .runtime_manager import RuntimeManager
 
@@ -17,6 +17,21 @@ class InstallManager:
     """
     Manages creating instances from installed runtimes.
     """
+
+    @staticmethod
+    def _report_progress(
+        progress_callback: Optional[Callable[[str, int, int, str], None]],
+        stage: str,
+        current: int = 0,
+        total: int = 0,
+        detail: str = "",
+    ):
+        if not progress_callback:
+            return
+        try:
+            progress_callback(stage, current, total, detail)
+        except Exception:
+            pass
     
     @staticmethod
     def _parse_semver(version: str):
@@ -699,23 +714,36 @@ class InstallManager:
                 shutil.copy2(src_file, dst_file)
 
     @classmethod
-    def _copy_instance_user_content(cls, old_instance_path: Path, new_instance_path: Path):
+    def _copy_instance_user_content(
+        cls,
+        old_instance_path: Path,
+        new_instance_path: Path,
+        progress_callback: Optional[Callable[[str, int, int, str], None]] = None,
+    ):
         """Copy user-generated folders from old instance to new instance."""
         preserve_dirs = {
-            ".openclaw": {"logs", "cache", "tmp", "temp", "node_modules", ".git"},
-            "extension": {"node_modules", ".git"},
-            "extensions": {"node_modules", ".git"},
-            "skills": {"node_modules", ".git"},
+            ".openclaw": {"node_modules"},
+            "extension": {"node_modules"},
+            "extensions": {"node_modules"},
+            "skills": {"node_modules"},
         }
 
-        for folder_name, ignore_dir_names in preserve_dirs.items():
+        total = len(preserve_dirs)
+        cls._report_progress(progress_callback, "migration", 0, total, "")
+
+        for idx, (folder_name, ignore_dir_names) in enumerate(preserve_dirs.items(), start=1):
             src = old_instance_path / folder_name
             dst = new_instance_path / folder_name
             logger.info(f"Migrating user content: {src} -> {dst}")
             cls._merge_directory(src, dst, ignore_dir_names=ignore_dir_names)
+            cls._report_progress(progress_callback, "migration", idx, total, folder_name)
 
     @classmethod
-    def update_instance_to_default_version(cls, instance_name: str):
+    def update_instance_to_default_version(
+        cls,
+        instance_name: str,
+        progress_callback: Optional[Callable[[str, int, int, str], None]] = None,
+    ):
         """
         Recreate an instance from default OpenClaw runtime, reinstall dependencies,
         migrate user folders, and keep old environment unchanged.
@@ -738,12 +766,14 @@ class InstallManager:
 
         instance_port = cls.get_instance_port(current_path)
         source_gateway_token = cls.get_instance_gateway_token(current_path, instance_name)
+        cls._report_progress(progress_callback, "bootstrap", 0, 0, "")
         cls.complete_install(
             new_instance_name,
             instance_port=instance_port,
             gateway_token=source_gateway_token,
         )
         logger.info(f"Bootstrap finished. Start migrating user folders from {instance_name} to {new_instance_name}")
-        cls._copy_instance_user_content(current_path, new_path)
+        cls._copy_instance_user_content(current_path, new_path, progress_callback=progress_callback)
         logger.info(f"User folder migration completed for {new_instance_name}")
+        cls._report_progress(progress_callback, "done", 1, 1, new_instance_name)
         return new_instance_name
