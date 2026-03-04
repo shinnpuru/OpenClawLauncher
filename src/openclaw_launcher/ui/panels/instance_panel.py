@@ -9,6 +9,9 @@ from ...core.install_manager import InstallManager
 from ...core.runtime_manager import RuntimeManager
 from ..i18n import i18n
 import shutil
+import os
+import stat
+import time
 
 class InstanceCreateWorker(QThread):
     finished = Signal()
@@ -28,10 +31,26 @@ class InstanceCreateWorker(QThread):
         except Exception as e:
             self.error.emit(str(e))
 
+class InstanceUpdateWorker(QThread):
+    finished = Signal(str)
+    error = Signal(str)
+
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+    def run(self):
+        try:
+            new_name = InstallManager.update_instance_to_default_version(self.name)
+            self.finished.emit(new_name)
+        except Exception as e:
+            self.error.emit(str(e))
+
 class InstancePanel(QWidget):
     def __init__(self):
         super().__init__()
         self.layout = QVBoxLayout(self)
+        self.worker = None
         
         # Instance List
         self.instance_list = QListWidget()
@@ -93,6 +112,10 @@ class InstancePanel(QWidget):
         btn_delete.clicked.connect(lambda checked=False, n=name: self.delete_instance(n))
         row_layout.addWidget(btn_delete)
 
+        btn_update = QPushButton(i18n.t("btn_update_version"))
+        btn_update.clicked.connect(lambda checked=False, n=name: self.update_instance(n))
+        row_layout.addWidget(btn_update)
+
         btn_open_webui = QPushButton(i18n.t("btn_open_webui"))
         btn_open_webui.clicked.connect(lambda checked=False, n=name: self.open_webui(n))
         row_layout.addWidget(btn_open_webui)
@@ -108,6 +131,7 @@ class InstancePanel(QWidget):
         is_running = raw_status == "Running"
         btn_start.setEnabled(not is_running)
         btn_stop.setEnabled(is_running)
+        btn_update.setEnabled(not is_running)
 
         return row_widget
 
@@ -124,6 +148,10 @@ class InstancePanel(QWidget):
                     self.instance_list.setItemWidget(list_item, row_widget)
 
     def create_instance(self):
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_task_busy"))
+            return
+
         missing_dependencies = self._get_missing_dependencies()
         if missing_dependencies:
             missing_text = "\n".join(f"- {dep}" for dep in missing_dependencies)
@@ -163,6 +191,32 @@ class InstancePanel(QWidget):
         self.worker.error.connect(lambda msg: self.on_create_error(name, msg))
         self.worker.start()
 
+    def update_instance(self, name):
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_task_busy"))
+            return
+
+        if ProcessManager.get_status(name) == "Running":
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_update_requires_stop", name=name))
+            return
+
+        res = QMessageBox.warning(
+            self,
+            i18n.t("title_confirm_update"),
+            i18n.t("msg_confirm_update_version", name=name),
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if res != QMessageBox.Yes:
+            return
+
+        self.status_label.setText(i18n.t("msg_updating_instance", name=name))
+        self.btn_create.setEnabled(False)
+
+        self.worker = InstanceUpdateWorker(name)
+        self.worker.finished.connect(lambda new_name: self.on_update_finished(name, new_name))
+        self.worker.error.connect(lambda msg: self.on_update_error(name, msg))
+        self.worker.start()
+
     def _get_missing_dependencies(self):
         missing = []
         runtime_manager = RuntimeManager()
@@ -190,6 +244,18 @@ class InstancePanel(QWidget):
          self.btn_create.setEnabled(True)
          self.worker = None
 
+    def on_update_finished(self, name, new_name):
+        self.status_label.setText(i18n.t("msg_update_success", name=name, new_name=new_name))
+        self.refresh_instances()
+        self.btn_create.setEnabled(True)
+        self.worker = None
+
+    def on_update_error(self, name, error_msg):
+        QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_update_error", name=name, error=error_msg))
+        self.status_label.setText(i18n.t("msg_update_failed", name=name))
+        self.btn_create.setEnabled(True)
+        self.worker = None
+
     def start_instance(self, name):
         
         try:
@@ -213,13 +279,68 @@ class InstancePanel(QWidget):
         res = QMessageBox.warning(self, i18n.t("title_confirm"), i18n.t("msg_confirm_delete", name=name),
                                   QMessageBox.Yes | QMessageBox.No)
         if res == QMessageBox.Yes:
+            instance_path = Config.get_instance_path(name)
             try:
-                if (Config.INSTANCES_DIR / name).exists():
-                     shutil.rmtree(Config.get_instance_path(name))
+                if ProcessManager.get_status(name) == "Running":
+                    ProcessManager.stop_instance(name)
+                    time.sleep(0.2)
+
+                if instance_path.exists():
+                    self._remove_dir_with_retries(instance_path)
+
+                if instance_path.exists():
+                    self._show_manual_cleanup_dialog(
+                        name,
+                        instance_path,
+                        i18n.t("msg_delete_manual_cleanup_detected", name=name, path=str(instance_path)),
+                    )
+                    return
+
                 self.status_label.setText(i18n.t("msg_deleted", name=name))
                 self.refresh_instances()
             except Exception as e:
-                 QMessageBox.critical(self, i18n.t("title_error"), str(e))
+                 if instance_path.exists():
+                     self._show_manual_cleanup_dialog(
+                         name,
+                         instance_path,
+                         i18n.t("msg_delete_manual_cleanup_hint", name=name, path=str(instance_path), error=str(e)),
+                     )
+                 else:
+                     QMessageBox.warning(self, i18n.t("title_warning"), str(e))
+
+    def _show_manual_cleanup_dialog(self, name, path, message):
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Warning)
+        dialog.setWindowTitle(i18n.t("title_warning"))
+        dialog.setText(message)
+        btn_open = dialog.addButton(i18n.t("btn_open_folder"), QMessageBox.ActionRole)
+        dialog.addButton(QMessageBox.Close)
+        dialog.exec()
+
+        if dialog.clickedButton() == btn_open and path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
+    def _remove_dir_with_retries(self, target_dir, retries=5, delay=0.2):
+        def _onerror(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
+
+        last_error = None
+        for attempt in range(retries):
+            try:
+                if target_dir.exists():
+                    shutil.rmtree(target_dir, onerror=_onerror)
+                return
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(delay)
+
+        if last_error:
+            raise last_error
 
     def open_webui(self, name):
         instance_path = Config.get_instance_path(name)

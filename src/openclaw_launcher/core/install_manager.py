@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 import os
+import stat
 import logging
 import json
 import re
@@ -35,6 +36,33 @@ class InstallManager:
                 parsed.append(0)
 
         return tuple(parsed)
+
+    @staticmethod
+    def _strip_instance_version_suffix(instance_name: str) -> str:
+        """Remove trailing version suffix like -v2026.3.2 or _2026.3.2-beta.1."""
+        if not instance_name:
+            return instance_name
+
+        pattern = re.compile(r"^(?P<base>.*?)(?:[-_]?v?\d+\.\d+(?:\.\d+)*(?:-[0-9A-Za-z.-]+)?)$")
+        match = pattern.match(instance_name)
+        if not match:
+            return instance_name
+
+        stripped = match.group("base").rstrip("-_")
+        return stripped or instance_name
+
+    @classmethod
+    def build_versioned_instance_name(cls, instance_name: str, openclaw_version: Optional[str] = None) -> str:
+        """Build target instance name as base-name + version, stripping old version suffix first."""
+        version = (openclaw_version or "").strip()
+        if not version:
+            rm = RuntimeManager()
+            version = (rm.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW) or "").strip()
+        if not version:
+            raise RuntimeError("No default OpenClaw runtime configured.")
+
+        base_name = cls._strip_instance_version_suffix(instance_name)
+        return f"{base_name}-{version}"
 
     @classmethod
     def _version_gte(cls, current: str, minimum: str) -> bool:
@@ -347,13 +375,19 @@ class InstallManager:
             log_stream.flush()
 
     @classmethod
-    def setup_instance_environment(cls, instance_path: Path, instance_name: str, instance_port: Optional[int] = None):
+    def setup_instance_environment(
+        cls,
+        instance_path: Path,
+        instance_name: str,
+        instance_port: Optional[int] = None,
+        gateway_token: Optional[str] = None,
+    ):
         """Prepare instance runtime/system environment variables and local env file."""
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
 
         if instance_port is None:
             instance_port = cls.get_instance_port(instance_path)
-        gateway_token = cls.get_instance_gateway_token(instance_path, instance_name)
+        resolved_gateway_token = gateway_token or cls.get_instance_gateway_token(instance_path, instance_name)
 
         env_file = instance_path / ".env.local"
         env_entries = {
@@ -361,7 +395,7 @@ class InstallManager:
             "CLAWDBOT_PROFILE": instance_name,
             "OPENCLAW_HOME": str(instance_path),
             "OPENCLAW_PORT": str(instance_port),
-            "OPENCLAW_GATEWAY_TOKEN": gateway_token
+            "OPENCLAW_GATEWAY_TOKEN": resolved_gateway_token
         }
 
         existing_lines = []
@@ -546,7 +580,13 @@ class InstallManager:
             log_stream.flush()
         
     @classmethod
-    def complete_install(cls, instance_name: str, instance_port: int = 18789, repo_url=None):
+    def complete_install(
+        cls,
+        instance_name: str,
+        instance_port: int = 18789,
+        repo_url=None,
+        gateway_token: Optional[str] = None,
+    ):
         """
         Creates a new instance by copying from the cached OpenClaw runtime.
         """
@@ -577,7 +617,12 @@ class InstallManager:
             log_file.flush()
 
             cls.ensure_node_runtime(target_path)
-            cls.setup_instance_environment(target_path, instance_name, instance_port=instance_port)
+            cls.setup_instance_environment(
+                target_path,
+                instance_name,
+                instance_port=instance_port,
+                gateway_token=gateway_token,
+            )
 
             if Config.get_setting("windows_a2ui_patch", False):
                 cls.apply_windows_a2ui_patch(target_path, log_stream=log_file)
@@ -601,3 +646,104 @@ class InstallManager:
             log_file.close()
             
         return target_path
+
+    @classmethod
+    def _is_reparse_point(cls, path: Path) -> bool:
+        try:
+            if path.is_symlink():
+                return True
+            st = os.lstat(path)
+            attrs = getattr(st, "st_file_attributes", 0)
+            return bool(attrs & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+        except Exception:
+            return False
+
+    @classmethod
+    def _merge_directory(cls, source_dir: Path, target_dir: Path, ignore_dir_names: Optional[set[str]] = None):
+        """Merge source directory into target directory, preserving user data."""
+        if not source_dir.exists():
+            return
+
+        if source_dir.is_file():
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_dir, target_dir)
+            return
+
+        ignore_dir_names = ignore_dir_names or set()
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        for root, dirs, files in os.walk(source_dir, topdown=True, followlinks=False):
+            root_path = Path(root)
+            relative_root = root_path.relative_to(source_dir)
+            current_target_root = target_dir / relative_root
+            current_target_root.mkdir(parents=True, exist_ok=True)
+
+            filtered_dirs = []
+            for d in dirs:
+                if d in ignore_dir_names:
+                    continue
+                src_dir = root_path / d
+                if cls._is_reparse_point(src_dir):
+                    logger.info(f"Skipping reparse point during migration: {src_dir}")
+                    continue
+                filtered_dirs.append(d)
+            dirs[:] = filtered_dirs
+
+            for f in files:
+                src_file = root_path / f
+                if cls._is_reparse_point(src_file):
+                    logger.info(f"Skipping reparse point file during migration: {src_file}")
+                    continue
+                dst_file = current_target_root / f
+                dst_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_file, dst_file)
+
+    @classmethod
+    def _copy_instance_user_content(cls, old_instance_path: Path, new_instance_path: Path):
+        """Copy user-generated folders from old instance to new instance."""
+        preserve_dirs = {
+            ".openclaw": {"logs", "cache", "tmp", "temp", "node_modules", ".git"},
+            "extension": {"node_modules", ".git"},
+            "extensions": {"node_modules", ".git"},
+            "skills": {"node_modules", ".git"},
+        }
+
+        for folder_name, ignore_dir_names in preserve_dirs.items():
+            src = old_instance_path / folder_name
+            dst = new_instance_path / folder_name
+            logger.info(f"Migrating user content: {src} -> {dst}")
+            cls._merge_directory(src, dst, ignore_dir_names=ignore_dir_names)
+
+    @classmethod
+    def update_instance_to_default_version(cls, instance_name: str):
+        """
+        Recreate an instance from default OpenClaw runtime, reinstall dependencies,
+        migrate user folders, and keep old environment unchanged.
+        """
+        Config.ensure_dirs()
+        current_path = Config.get_instance_path(instance_name)
+
+        if not current_path.exists() or not current_path.is_dir():
+            raise FileNotFoundError(f"Instance directory not found: {current_path}")
+
+        rm = RuntimeManager()
+        oc_ver = rm.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW)
+        if not oc_ver:
+            raise RuntimeError("No OpenClaw runtime downloaded. Please download it from Dependencies tab.")
+
+        new_instance_name = cls.build_versioned_instance_name(instance_name, oc_ver)
+        new_path = Config.get_instance_path(new_instance_name)
+        if new_path.exists():
+            raise FileExistsError(f"Target instance already exists: {new_instance_name}")
+
+        instance_port = cls.get_instance_port(current_path)
+        source_gateway_token = cls.get_instance_gateway_token(current_path, instance_name)
+        cls.complete_install(
+            new_instance_name,
+            instance_port=instance_port,
+            gateway_token=source_gateway_token,
+        )
+        logger.info(f"Bootstrap finished. Start migrating user folders from {instance_name} to {new_instance_name}")
+        cls._copy_instance_user_content(current_path, new_path)
+        logger.info(f"User folder migration completed for {new_instance_name}")
+        return new_instance_name

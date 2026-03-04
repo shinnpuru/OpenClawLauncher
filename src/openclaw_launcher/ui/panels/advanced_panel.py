@@ -4,8 +4,12 @@ from PySide6.QtWidgets import (
 )
 from ...core.config import Config
 from ...core.autostart_manager import AutoStartManager
+from ...core.process_manager import ProcessManager
 from ..i18n import i18n
 import shutil
+import os
+import stat
+import time
 
 class AdvancedPanel(QWidget):
     def __init__(self):
@@ -296,6 +300,28 @@ class AdvancedPanel(QWidget):
         message = i18n.t("msg_saved_setting").format(key=key)
         QMessageBox.information(self, i18n.t("title_success"), message)
 
+    def _remove_dir_with_retries(self, target_dir, retries=5, delay=0.2):
+        def _onerror(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
+
+        last_error = None
+        for attempt in range(retries):
+            try:
+                if target_dir.exists():
+                    shutil.rmtree(target_dir, onerror=_onerror)
+                return
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(delay)
+
+        if last_error:
+            raise last_error
+
     def execute_clear_dependencies(self):
         reply = QMessageBox.question(
             self,
@@ -313,7 +339,7 @@ class AdvancedPanel(QWidget):
                         continue
                     for dep_dir in (instance_dir / "node_modules", instance_dir / ".venv"):
                         if dep_dir.exists():
-                            shutil.rmtree(dep_dir)
+                            self._remove_dir_with_retries(dep_dir)
             QMessageBox.information(self, i18n.t("title_success"), i18n.t("msg_clear_dependencies_success"))
         except Exception as e:
             QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_operation_failed", error=str(e)))
@@ -329,8 +355,10 @@ class AdvancedPanel(QWidget):
             return
 
         try:
+            ProcessManager.stop_all_instances()
+            time.sleep(0.2)
             if Config.INSTANCES_DIR.exists():
-                shutil.rmtree(Config.INSTANCES_DIR)
+                self._remove_dir_with_retries(Config.INSTANCES_DIR)
             Config.INSTANCES_DIR.mkdir(parents=True, exist_ok=True)
             QMessageBox.information(self, i18n.t("title_success"), i18n.t("msg_clear_instances_success"))
         except Exception as e:
@@ -349,7 +377,7 @@ class AdvancedPanel(QWidget):
         try:
             backup_dir = Config.BASE_DIR / "backups"
             if backup_dir.exists():
-                shutil.rmtree(backup_dir)
+                self._remove_dir_with_retries(backup_dir)
             backup_dir.mkdir(parents=True, exist_ok=True)
             QMessageBox.information(self, i18n.t("title_success"), i18n.t("msg_clear_backups_success"))
         except Exception as e:
