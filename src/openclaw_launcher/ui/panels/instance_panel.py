@@ -56,6 +56,50 @@ class InstanceUpdateWorker(QThread):
         except Exception as e:
             self.error.emit(str(e))
 
+
+class InstanceDeleteWorker(QThread):
+    finished = Signal(str, bool, str)
+    error = Signal(str, str, str)
+
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+    def run(self):
+        instance_path = Config.get_instance_path(self.name)
+        try:
+            if ProcessManager.get_status(self.name) == "Running":
+                ProcessManager.stop_instance(self.name)
+
+            if instance_path.exists():
+                self._remove_dir_with_retries(instance_path)
+
+            self.finished.emit(self.name, instance_path.exists(), str(instance_path))
+        except Exception as e:
+            self.error.emit(self.name, str(e), str(instance_path))
+
+    def _remove_dir_with_retries(self, target_dir, retries=5, delay=0.2):
+        def _onerror(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
+
+        last_error = None
+        for attempt in range(retries):
+            try:
+                if target_dir.exists():
+                    shutil.rmtree(target_dir, onerror=_onerror)
+                return
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(delay)
+
+        if last_error:
+            raise last_error
+
 class InstancePanel(QWidget):
     def __init__(self):
         super().__init__()
@@ -88,6 +132,11 @@ class InstancePanel(QWidget):
         self.update_progress.setVisible(False)
         self.update_progress.setTextVisible(True)
         self.layout.addWidget(self.update_progress)
+
+        self.delete_progress = QProgressBar()
+        self.delete_progress.setVisible(False)
+        self.delete_progress.setTextVisible(True)
+        self.layout.addWidget(self.delete_progress)
         
         self.backup_progress = QProgressBar()
         self.backup_progress.setVisible(False)
@@ -386,38 +435,61 @@ class InstancePanel(QWidget):
             QMessageBox.critical(self, i18n.t("title_error"), str(e))
 
     def delete_instance(self, name):
-        
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_task_busy"))
+            return
+
         res = QMessageBox.warning(self, i18n.t("title_confirm"), i18n.t("msg_confirm_delete", name=name),
                                   QMessageBox.Yes | QMessageBox.No)
-        if res == QMessageBox.Yes:
-            instance_path = Config.get_instance_path(name)
-            try:
-                if ProcessManager.get_status(name) == "Running":
-                    ProcessManager.stop_instance(name)
-                    time.sleep(0.2)
+        if res != QMessageBox.Yes:
+            return
 
-                if instance_path.exists():
-                    self._remove_dir_with_retries(instance_path)
+        self.status_label.setText(i18n.t("msg_deleting_instance", name=name))
+        self.btn_create.setEnabled(False)
+        self.delete_progress.setVisible(True)
+        self.delete_progress.setRange(0, 0)
+        self.delete_progress.setFormat(i18n.t("progress_delete_running"))
 
-                if instance_path.exists():
-                    self._show_manual_cleanup_dialog(
-                        name,
-                        instance_path,
-                        i18n.t("msg_delete_manual_cleanup_detected", name=name, path=str(instance_path)),
-                    )
-                    return
+        self.worker = InstanceDeleteWorker(name)
+        self.worker.finished.connect(self.on_delete_finished)
+        self.worker.error.connect(self.on_delete_error)
+        self.worker.start()
 
-                self.status_label.setText(i18n.t("msg_deleted", name=name))
-                self.refresh_instances()
-            except Exception as e:
-                 if instance_path.exists():
-                     self._show_manual_cleanup_dialog(
-                         name,
-                         instance_path,
-                         i18n.t("msg_delete_manual_cleanup_hint", name=name, path=str(instance_path), error=str(e)),
-                     )
-                 else:
-                     QMessageBox.warning(self, i18n.t("title_warning"), str(e))
+    def on_delete_finished(self, name, residual_exists, instance_path_str):
+        self.delete_progress.setVisible(False)
+        self.btn_create.setEnabled(True)
+
+        instance_path = Path(instance_path_str)
+        if residual_exists:
+            self._show_manual_cleanup_dialog(
+                name,
+                instance_path,
+                i18n.t("msg_delete_manual_cleanup_detected", name=name, path=str(instance_path)),
+            )
+            self.status_label.setText(i18n.t("title_warning"))
+        else:
+            self.status_label.setText(i18n.t("msg_deleted", name=name))
+
+        self.refresh_instances()
+        self.worker = None
+
+    def on_delete_error(self, name, error_msg, instance_path_str):
+        self.delete_progress.setVisible(False)
+        self.btn_create.setEnabled(True)
+
+        instance_path = Path(instance_path_str)
+        if instance_path.exists():
+            self._show_manual_cleanup_dialog(
+                name,
+                instance_path,
+                i18n.t("msg_delete_manual_cleanup_hint", name=name, path=str(instance_path), error=error_msg),
+            )
+        else:
+            QMessageBox.warning(self, i18n.t("title_warning"), error_msg)
+
+        self.status_label.setText(i18n.t("title_warning"))
+        self.refresh_instances()
+        self.worker = None
 
     def _show_manual_cleanup_dialog(self, name, path, message):
         dialog = QMessageBox(self)
@@ -430,28 +502,6 @@ class InstancePanel(QWidget):
 
         if dialog.clickedButton() == btn_open and path.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
-
-    def _remove_dir_with_retries(self, target_dir, retries=5, delay=0.2):
-        def _onerror(func, path, exc_info):
-            try:
-                os.chmod(path, stat.S_IWRITE)
-                func(path)
-            except Exception:
-                pass
-
-        last_error = None
-        for attempt in range(retries):
-            try:
-                if target_dir.exists():
-                    shutil.rmtree(target_dir, onerror=_onerror)
-                return
-            except Exception as e:
-                last_error = e
-                if attempt < retries - 1:
-                    time.sleep(delay)
-
-        if last_error:
-            raise last_error
 
     def open_webui(self, name):
         instance_path = Config.get_instance_path(name)

@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
 )
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, Signal, QTimer
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 
@@ -111,7 +111,10 @@ class OnboardPanel(QWidget):
         self.layout.addSpacing(12)
 
         # Step 1: dependencies
-        dep_layout = QHBoxLayout()
+        self.step_dep_widget = QWidget()
+        self.step_dep_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
+        dep_layout = QHBoxLayout(self.step_dep_widget)
+        dep_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_step_dep = QLabel(i18n.t("onboard_step_dependencies"))
         dep_layout.addWidget(self.lbl_step_dep)
         dep_layout.addStretch()
@@ -120,7 +123,7 @@ class OnboardPanel(QWidget):
         self.btn_install_deps = QPushButton(i18n.t("onboard_btn_install_dependencies"))
         self.btn_install_deps.clicked.connect(self.install_dependencies)
         dep_layout.addWidget(self.btn_install_deps)
-        self.layout.addLayout(dep_layout)
+        self.layout.addWidget(self.step_dep_widget)
 
         # Step 1 Progress Bar
         self.progress_dep = QProgressBar()
@@ -129,7 +132,10 @@ class OnboardPanel(QWidget):
         self.layout.addWidget(self.progress_dep)
 
         # Step 2: sample instance
-        sample_layout = QHBoxLayout()
+        self.step_sample_widget = QWidget()
+        self.step_sample_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
+        sample_layout = QHBoxLayout(self.step_sample_widget)
+        sample_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_step_sample = QLabel(i18n.t("onboard_step_sample"))
         sample_layout.addWidget(self.lbl_step_sample)
         sample_layout.addStretch()
@@ -138,7 +144,7 @@ class OnboardPanel(QWidget):
         self.btn_create_sample = QPushButton(i18n.t("onboard_btn_create_sample"))
         self.btn_create_sample.clicked.connect(self.create_sample)
         sample_layout.addWidget(self.btn_create_sample)
-        self.layout.addLayout(sample_layout)
+        self.layout.addWidget(self.step_sample_widget)
 
         # Step 2 Progress Bar
         self.progress_sample = QProgressBar()
@@ -146,18 +152,11 @@ class OnboardPanel(QWidget):
         self.progress_sample.setMaximum(100)
         self.layout.addWidget(self.progress_sample)
 
-        # Step 3: launch onboard CLI command
-        cli_layout = QHBoxLayout()
-        self.lbl_step_cli = QLabel(i18n.t("onboard_step_cli_onboard"))
-        cli_layout.addWidget(self.lbl_step_cli)
-        cli_layout.addStretch()
-        self.btn_open_onboard_cli = QPushButton(i18n.t("onboard_btn_open_cli_onboard"))
-        self.btn_open_onboard_cli.clicked.connect(self.open_onboard_cli)
-        cli_layout.addWidget(self.btn_open_onboard_cli)
-        self.layout.addLayout(cli_layout)
-
-        # Step 4: start sample instance
-        start_layout = QHBoxLayout()
+        # Step 3: start sample instance
+        self.step_start_widget = QWidget()
+        self.step_start_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
+        start_layout = QHBoxLayout(self.step_start_widget)
+        start_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_step_start = QLabel(i18n.t("onboard_step_start_instance"))
         start_layout.addWidget(self.lbl_step_start)
         start_layout.addStretch()
@@ -166,17 +165,21 @@ class OnboardPanel(QWidget):
         self.btn_start_sample = QPushButton(i18n.t("onboard_btn_start_instance"))
         self.btn_start_sample.clicked.connect(self.start_sample_instance)
         start_layout.addWidget(self.btn_start_sample)
-        self.layout.addLayout(start_layout)
+        self.layout.addWidget(self.step_start_widget)
 
-        # Step 5: open WebUI
-        webui_layout = QHBoxLayout()
+        # Step 4: open WebUI
+        self.step_webui_widget = QWidget()
+        self.step_webui_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
+        webui_layout = QHBoxLayout(self.step_webui_widget)
+        webui_layout.setContentsMargins(10, 8, 10, 8)
         self.lbl_step_webui = QLabel(i18n.t("onboard_step_open_webui"))
+        self.lbl_step_webui.setStyleSheet("font-size: 15px; font-weight: 600;")
         webui_layout.addWidget(self.lbl_step_webui)
         webui_layout.addStretch()
         self.btn_open_webui = QPushButton(i18n.t("onboard_btn_open_webui"))
         self.btn_open_webui.clicked.connect(self.open_sample_webui)
         webui_layout.addWidget(self.btn_open_webui)
-        self.layout.addLayout(webui_layout)
+        self.layout.addWidget(self.step_webui_widget)
 
         self.layout.addSpacing(8)
 
@@ -184,6 +187,10 @@ class OnboardPanel(QWidget):
         self.layout.addWidget(self.lbl_status)
 
         self.layout.addStretch()
+
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.refresh_status)
+        self.refresh_timer.start(2000)
 
         self.refresh_status()
 
@@ -203,19 +210,29 @@ class OnboardPanel(QWidget):
 
     def _apply_step_style(self, title_label: QLabel, status_label: QLabel, completed: bool):
         if completed:
-            title_label.setStyleSheet("color: gray;")
-            status_label.setStyleSheet("color: gray;")
+            title_label.setStyleSheet("color: gray; font-size: 15px; font-weight: 600;")
+            status_label.setStyleSheet("color: gray; font-size: 14px;")
         else:
-            title_label.setStyleSheet("")
-            status_label.setStyleSheet("")
+            title_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+            status_label.setStyleSheet("font-size: 14px;")
 
     def refresh_status(self):
         deps_done = self._dependencies_ok()
         sample_done = self._sample_ok()
         running_done = self._sample_running()
+        dep_task_running = bool(self.dep_worker and self.dep_worker.isRunning())
+        sample_task_running = bool(self.sample_worker and self.sample_worker.isRunning())
 
-        self.lbl_dep_status.setText(i18n.t("onboard_step_done") if deps_done else i18n.t("onboard_step_pending"))
-        self.lbl_sample_status.setText(i18n.t("onboard_step_done") if sample_done else i18n.t("onboard_step_pending"))
+        self.lbl_dep_status.setText(
+            i18n.t("onboard_btn_installing")
+            if dep_task_running
+            else (i18n.t("onboard_step_done") if deps_done else i18n.t("onboard_step_pending"))
+        )
+        self.lbl_sample_status.setText(
+            i18n.t("onboard_btn_creating")
+            if sample_task_running
+            else (i18n.t("onboard_step_done") if sample_done else i18n.t("onboard_step_pending"))
+        )
         self.lbl_start_status.setText(i18n.t("onboard_step_done") if running_done else i18n.t("onboard_step_pending"))
 
         self._apply_step_style(self.lbl_step_dep, self.lbl_dep_status, deps_done)
@@ -241,9 +258,12 @@ class OnboardPanel(QWidget):
 
         self.btn_open_webui.setEnabled(running_done)
 
-        self.btn_open_onboard_cli.setEnabled(sample_done)
-
-        if deps_done and sample_done and running_done:
+        if dep_task_running:
+            # 依赖安装期间可能会有更细粒度进度文案，通过 on_dep_progress 更新，这里不覆盖。
+            pass
+        elif sample_task_running:
+            self.lbl_status.setText(i18n.t("onboard_status_creating_sample", name=self.SAMPLE_INSTANCE_NAME))
+        elif deps_done and sample_done and running_done:
             self.lbl_status.setText(i18n.t("onboard_all_done"))
         elif not deps_done:
             self.lbl_status.setText(i18n.t("onboard_hint_install_dependencies"))
@@ -365,25 +385,6 @@ class OnboardPanel(QWidget):
         QDesktopServices.openUrl(url)
         self.lbl_status.setText(i18n.t("onboard_msg_webui_opened", url=url.toString()))
 
-    def open_onboard_cli(self):
-        if not self._sample_ok():
-            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_not_found"))
-            self.refresh_status()
-            return
-
-        try:
-            ProcessManager.launch_instance_onboard_cli(
-                self.SAMPLE_INSTANCE_NAME,
-                Config.get_instance_path(self.SAMPLE_INSTANCE_NAME),
-            )
-            self.lbl_status.setText(i18n.t("onboard_msg_cli_opened"))
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                i18n.t("title_error"),
-                i18n.t("onboard_msg_cli_open_failed", error=str(e)),
-            )
-
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.lbl_desc.setText(i18n.t("onboard_desc"))
@@ -392,11 +393,12 @@ class OnboardPanel(QWidget):
         self.lbl_step_start.setText(i18n.t("onboard_step_start_instance"))
         self.lbl_step_webui.setText(i18n.t("onboard_step_open_webui"))
         self.btn_open_webui.setText(i18n.t("onboard_btn_open_webui"))
-        self.lbl_step_cli.setText(i18n.t("onboard_step_cli_onboard"))
-        self.btn_open_onboard_cli.setText(i18n.t("onboard_btn_open_cli_onboard"))
         self.refresh_status()
 
     def shutdown(self):
+        if hasattr(self, "refresh_timer") and self.refresh_timer:
+            self.refresh_timer.stop()
+
         worker = self.dep_worker
         if worker and worker.isRunning():
             worker.requestInterruption()

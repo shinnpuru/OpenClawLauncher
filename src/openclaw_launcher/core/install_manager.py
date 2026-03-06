@@ -593,7 +593,105 @@ class InstallManager:
 
         if log_stream is not None:
             log_stream.flush()
-        
+
+    @classmethod
+    def apply_default_openclaw_config(cls, instance_path: Path):
+        """Apply launcher default OpenClaw config overrides while preserving workspace."""
+        config_path = instance_path / ".openclaw" / "openclaw.json"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        config_data = {}
+        if config_path.exists():
+            try:
+                loaded = json.loads(config_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    config_data = loaded
+            except Exception as exc:
+                raise RuntimeError(f"Failed to parse OpenClaw config: {exc}") from exc
+
+        preserved_workspace = None
+        agents_obj = config_data.get("agents")
+        if isinstance(agents_obj, dict):
+            defaults_obj = agents_obj.get("defaults")
+            if isinstance(defaults_obj, dict):
+                workspace_obj = defaults_obj.get("workspace")
+                if isinstance(workspace_obj, str) and workspace_obj.strip():
+                    preserved_workspace = workspace_obj
+
+        config_data["browser"] = {
+            "defaultProfile": "openclaw"
+        }
+
+        config_data["channels"] = {
+            "feishu": {
+                "appId": "__OPENCLAW_REDACTED__",
+                "appSecret": "__OPENCLAW_REDACTED__",
+                "enabled": True,
+                "renderMode": "card",
+                "topicSessionMode": "disabled",
+                "groupPolicy": "open",
+                "chunkMode": "length",
+                "connectionMode": "websocket",
+                "dmPolicy": "open"
+            }
+        }
+
+        config_data["models"] = {
+            "providers": {
+                "moonshot": {
+                    "baseUrl": "https://api.moonshot.cn/v1",
+                    "apiKey": "__OPENCLAW_REDACTED__",
+                    "auth": "api-key",
+                    "api": "openai-completions",
+                    "models": [
+                        {
+                            "id": "kimi-k2.5",
+                            "name": "kimi-k2.5",
+                            "api": "openai-completions",
+                            "reasoning": False,
+                            "input": [
+                                "text"
+                            ],
+                            "cost": {
+                                "input": 0,
+                                "output": 0,
+                                "cacheRead": 0,
+                                "cacheWrite": 0
+                            },
+                            "contextWindow": 200000,
+                            "maxTokens": 8192
+                        }
+                    ]
+                }
+            }
+        }
+
+        if not isinstance(agents_obj, dict):
+            agents_obj = {}
+
+        defaults_config = {
+            "model": {
+                "primary": "moonshot/kimi-k2.5"
+            },
+            "models": {
+                "moonshot/kimi-k2.5": {}
+            },
+            "compaction": {
+                "mode": "safeguard"
+            },
+            "maxConcurrent": 4,
+            "subagents": {
+                "maxConcurrent": 8
+            }
+        }
+        if preserved_workspace:
+            defaults_config["workspace"] = preserved_workspace
+
+        agents_obj["defaults"] = defaults_config
+        config_data["agents"] = agents_obj
+
+        config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
     @classmethod
     def complete_install(
         cls,
@@ -646,6 +744,7 @@ class InstallManager:
             cls.build_frontend(target_path, instance_name, log_stream=log_file)
             cls.build_backend(target_path, instance_name, log_stream=log_file)
             cls.run_onboard_non_interactive(target_path, instance_name, instance_port, log_stream=log_file)
+            cls.apply_default_openclaw_config(target_path)
 
             log_file.write("===== Instance bootstrap completed =====\n")
             log_file.flush()
