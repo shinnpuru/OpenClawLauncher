@@ -60,7 +60,7 @@
 
 启动 `OpenClaw Launcher` 后：
 
-- 建议先进入“引导（Onboard）”面板完成首次初始化。
+- 建议先进入“引导（Onboard）”面板完成首次初始化。教程详见[Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)。
 - 在“依赖（Dependencies）”面板确认 Node.js / OpenClaw（必需）以及 Python / uv（可选）。
 - 在“实例（Instances）”面板创建并启动实例，按需更新版本或打开目录/CLI。
 - 在“插件（Plugins）”面板安装所需插件。

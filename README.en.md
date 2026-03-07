@@ -59,7 +59,7 @@ Install with your platform package:
 
 After launching `OpenClaw Launcher`:
 
-- Start with the **Onboard** panel for first-run initialization.
+- Start with the **Onboard** panel for first-run initialization. Tutorial: [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)
 - Confirm Node.js / OpenClaw (required) and Python / uv (optional) in **Dependencies**.
 - Create and run instances in **Instances**, then update version or open folder/CLI when needed.
 - Install required extensions in **Plugins**.
