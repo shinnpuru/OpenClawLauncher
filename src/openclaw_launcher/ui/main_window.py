@@ -161,7 +161,7 @@ class MainWindow(QMainWindow):
         )
 
     def toggle_language(self):
-        new_lang = "zh" if i18n.current_lang == "en" else "zh"
+        new_lang = "zh" if i18n.current_lang == "en" else "en"
         i18n.set_language(new_lang)
 
     def on_language_changed(self, lang):

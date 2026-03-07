@@ -108,6 +108,11 @@ class OnboardPanel(QWidget):
         self.lbl_desc.setWordWrap(True)
         self.layout.addWidget(self.lbl_desc)
 
+        # Wiki / docs (top)
+        self.btn_wiki = QPushButton(i18n.t("onboard_btn_wiki"))
+        self.btn_wiki.clicked.connect(lambda: self.open_url("https://github.com/shinnpuru/OpenClawLauncher"))
+        self.layout.addWidget(self.btn_wiki)
+
         self.layout.addSpacing(12)
 
         # Step 1: dependencies
@@ -187,6 +192,27 @@ class OnboardPanel(QWidget):
         self.layout.addWidget(self.lbl_status)
 
         self.layout.addStretch()
+
+        self.layout.addSpacing(10)
+
+        # Sponsorship links
+        self.lbl_support = QLabel(i18n.t("onboard_support_title"))
+        self.lbl_support.setStyleSheet("font-size: 15px; font-weight: 600;")
+        self.layout.addWidget(self.lbl_support)
+
+        support_btn_layout = QHBoxLayout()
+        self.btn_afdian = QPushButton(i18n.t("onboard_btn_afdian"))
+        self.btn_bilibili = QPushButton(i18n.t("onboard_btn_bilibili"))
+        self.btn_kofi = QPushButton(i18n.t("onboard_btn_kofi"))
+
+        self.btn_afdian.clicked.connect(lambda: self.open_url("https://afdian.com/a/shinnpuru"))
+        self.btn_bilibili.clicked.connect(lambda: self.open_url("https://space.bilibili.com/36464441"))
+        self.btn_kofi.clicked.connect(lambda: self.open_url("https://ko-fi.com/U7U018MISY"))
+
+        support_btn_layout.addWidget(self.btn_afdian)
+        support_btn_layout.addWidget(self.btn_bilibili)
+        support_btn_layout.addWidget(self.btn_kofi)
+        self.layout.addLayout(support_btn_layout)
 
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_status)
@@ -385,6 +411,9 @@ class OnboardPanel(QWidget):
         QDesktopServices.openUrl(url)
         self.lbl_status.setText(i18n.t("onboard_msg_webui_opened", url=url.toString()))
 
+    def open_url(self, url: str):
+        QDesktopServices.openUrl(QUrl(url))
+
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.lbl_desc.setText(i18n.t("onboard_desc"))
@@ -393,6 +422,11 @@ class OnboardPanel(QWidget):
         self.lbl_step_start.setText(i18n.t("onboard_step_start_instance"))
         self.lbl_step_webui.setText(i18n.t("onboard_step_open_webui"))
         self.btn_open_webui.setText(i18n.t("onboard_btn_open_webui"))
+        self.btn_wiki.setText(i18n.t("onboard_btn_wiki"))
+        self.lbl_support.setText(i18n.t("onboard_support_title"))
+        self.btn_afdian.setText(i18n.t("onboard_btn_afdian"))
+        self.btn_bilibili.setText(i18n.t("onboard_btn_bilibili"))
+        self.btn_kofi.setText(i18n.t("onboard_btn_kofi"))
         self.refresh_status()
 
     def shutdown(self):
