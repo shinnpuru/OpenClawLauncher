@@ -95,11 +95,16 @@ class InstallManager:
         if not installed:
             return None
 
-        return max(
-            (item.get("version") for item in installed if item.get("version")),
-            key=cls._parse_semver,
-            default=None,
-        )
+        versions: list[str] = [
+            version
+            for item in installed
+            for version in [item.get("version")]
+            if isinstance(version, str) and version
+        ]
+        if not versions:
+            return None
+
+        return max(versions, key=cls._parse_semver)
 
     @classmethod
     def _get_required_node_version(cls, instance_path: Path) -> str:
@@ -137,8 +142,13 @@ class InstallManager:
             return
 
         available = rm.get_available_versions(RuntimeManager.SOFTWARE_NODE)
-        candidates = sorted(
-            [item.get("version") for item in available if item.get("version")],
+        candidates: list[str] = sorted(
+            [
+                version
+                for item in available
+                for version in [item.get("version")]
+                if isinstance(version, str) and version
+            ],
             key=cls._parse_semver,
             reverse=True,
         )
@@ -151,7 +161,46 @@ class InstallManager:
         rm.install_version(RuntimeManager.SOFTWARE_NODE, target)
 
     @classmethod
-    def get_runtime_env(cls, instance_path: Path = None, instance_name: str = None) -> dict:
+    def _ensure_runtime_node_wrappers(cls, instance_path: Path, node_bin_dir: Path) -> Optional[Path]:
+        """Create stable wrappers for Node tools to avoid broken bundled shims."""
+        node_cmd = node_bin_dir / "node"
+        if not node_cmd.exists() or not node_cmd.is_file():
+            return None
+
+        runtime_root = node_bin_dir.parent
+        wrapper_dir = instance_path / ".openclaw" / "runtime-bin"
+        wrapper_dir.mkdir(parents=True, exist_ok=True)
+
+        tool_map = {
+            "npm": runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+            "npx": runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npx-cli.js",
+            "corepack": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "corepack.js",
+            "pnpm": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "pnpm.js",
+            "pnpx": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "pnpx.js",
+            "yarn": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "yarn.js",
+            "yarnpkg": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "yarnpkg.js",
+        }
+
+        for tool, entry_js in tool_map.items():
+            if not entry_js.exists() or not entry_js.is_file():
+                continue
+
+            wrapper_path = wrapper_dir / tool
+            script = (
+                "#!/bin/sh\n"
+                f"exec \"{node_cmd}\" \"{entry_js}\" \"$@\"\n"
+            )
+            wrapper_path.write_text(script, encoding="utf-8")
+            wrapper_path.chmod(0o755)
+
+        return wrapper_dir
+
+    @classmethod
+    def get_runtime_env(
+        cls,
+        instance_path: Optional[Path] = None,
+        instance_name: Optional[str] = None,
+    ) -> dict:
         """Construct environment variables with runtime paths and instance settings."""
         env = os.environ.copy()
         rm = RuntimeManager()
@@ -171,9 +220,14 @@ class InstallManager:
 
         # Node
         node_ver = rm.get_default_version(RuntimeManager.SOFTWARE_NODE)
+        runtime_wrapper_dir = None
         if node_ver:
             exe_path = rm.get_executable_path(RuntimeManager.SOFTWARE_NODE, node_ver)
             node_bin_dir = exe_path.parent
+            if instance_path:
+                runtime_wrapper_dir = cls._ensure_runtime_node_wrappers(instance_path, node_bin_dir)
+                if runtime_wrapper_dir:
+                    paths_to_add.append(str(runtime_wrapper_dir))
             paths_to_add.append(str(node_bin_dir))
              
         # UV
@@ -216,9 +270,12 @@ class InstallManager:
         env["COREPACK_ENABLE_DOWNLOAD_PROMPT"] = "0"
         env["CI"] = "1"
         env["COREPACK_INTEGRITY_KEYS"] = "0"
+        env["COREPACK_DEFAULT_TO_LATEST"] = "0"
 
         if node_bin_dir:
             env["OPENCLAW_RUNTIME_NODE_BIN"] = str(node_bin_dir)
+            if runtime_wrapper_dir:
+                env["OPENCLAW_RUNTIME_NODE_WRAPPER_BIN"] = str(runtime_wrapper_dir)
         if python_bin_dir:
             env["OPENCLAW_RUNTIME_PYTHON_BIN"] = str(python_bin_dir)
         if uv_bin_dir:
@@ -305,7 +362,12 @@ class InstallManager:
     def _find_runtime_tool(cls, env: dict, tool_name: str) -> str:
         """Resolve runtime Node tool path from configured runtime binaries only."""
         runtime_bin = env.get("OPENCLAW_RUNTIME_NODE_BIN", "").strip()
+        wrapper_bin = env.get("OPENCLAW_RUNTIME_NODE_WRAPPER_BIN", "").strip()
         candidates = []
+
+        if wrapper_bin:
+            wrapper_base = Path(wrapper_bin)
+            candidates.append(wrapper_base / tool_name)
 
         if runtime_bin:
             base = Path(runtime_bin)
