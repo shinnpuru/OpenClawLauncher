@@ -1,13 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 import sys
+from scripts.prepare_llama_cpp import collect_llama_datas, prepare_llama_cpp_for_target
 
 block_cipher = None
+
+LLAMA_CPP_TAG = os.environ.get("LLAMA_CPP_TAG", "latest")
+LLAMA_CPP_TARGET = os.environ.get("LLAMA_CPP_TARGET", "win-vulkan-x64")
+
+prepare_llama_cpp_for_target(
+    LLAMA_CPP_TARGET,
+    tag=LLAMA_CPP_TAG,
+)
 
 datas = [
     ("src/openclaw_launcher/ui/i18n", "openclaw_launcher/ui/i18n"),
     ("logo.png", "."),
 ]
+
+datas.extend(collect_llama_datas("llama"))
 
 icon_file = "logo.ico" if sys.platform.startswith("win") else "logo.png"
 

@@ -14,9 +14,12 @@ on:
 permissions:
   contents: write
 
+env:
+  LLAMA_CPP_TAG: latest
+
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,8 +27,13 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
+            llama_target: win-vulkan-x64
+          - os: windows-latest
+            platform: windows-cuda
+            llama_target: win-cuda-12.4-x64
           - os: macos-latest
             platform: macos
+            llama_target: macos-arm64
 
     steps:
       - name: Checkout
@@ -48,8 +56,17 @@ jobs:
             uv sync --dev
           fi
 
+      - name: Prepare llama.cpp runtime
+        shell: bash
+        run: |
+          uv run python scripts/prepare_llama_cpp.py \
+            --target "${{ matrix.llama_target }}" \
+            --tag "${LLAMA_CPP_TAG}"
+
       - name: Build executable with PyInstaller
         shell: bash
+        env:
+          LLAMA_CPP_TARGET: ${{ matrix.llama_target }}
         run: |
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             uv run pyinstaller app-macos.spec

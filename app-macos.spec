@@ -1,11 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+from scripts.prepare_llama_cpp import collect_llama_datas, prepare_llama_cpp_for_target
+
 block_cipher = None
+
+LLAMA_CPP_TAG = os.environ.get("LLAMA_CPP_TAG", "latest")
+
+prepare_llama_cpp_for_target(
+    "macos-arm64",
+    tag=LLAMA_CPP_TAG,
+)
 
 datas = [
     ("src/openclaw_launcher/ui/i18n", "openclaw_launcher/ui/i18n"),
     ("logo.png", "."),
 ]
+
+datas.extend(collect_llama_datas("llama"))
 
 a = Analysis(
     ["src/openclaw_launcher/main.py"],
