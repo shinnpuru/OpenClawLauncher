@@ -3,517 +3,347 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenClaw Launcher | 专业介绍页</title>
-  <meta name="description" content="OpenClaw Launcher 是一个专业的桌面启动器，帮助你图形化安装、管理与运行 OpenClaw。" />
+  <title>OpenClaw Launcher | 本地 OpenClaw + 本地 LLM 一键部署</title>
+  <meta name="description" content="OpenClaw Launcher 是基于 PySide6 的桌面启动器，提供引导式上手、多实例管理、依赖检查、模型切换、日志与备份恢复。" />
   <link rel="icon" href="./icon.ico" type="image/x-icon" />
   <style>
     :root {
-      --bg: #0b1020;
-      --bg-soft: #121a33;
-      --card: rgba(20, 28, 55, 0.72);
-      --text: #e6ecff;
-      --muted: #a9b4d0;
-      --primary: #5d8cff;
-      --primary-2: #7f6bff;
-      --ok: #49d299;
-      --border: rgba(150, 170, 220, 0.2);
-      --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      color-scheme: light dark;
+      --md-bg: #f7f8fc;
+      --md-surface: #ffffff;
+      --md-surface-2: #eff2ff;
+      --md-text: #1a1c22;
+      --md-muted: #596074;
+      --md-primary: #4758f3;
+      --md-primary-strong: #2f46f0;
+      --md-outline: #d8ddef;
+      --md-shadow: 0 8px 28px rgba(40, 54, 125, 0.12);
+      --md-radius: 20px;
+    }
+
+    :root[data-theme="dark"] {
+      --md-bg: #0f1116;
+      --md-surface: #171a22;
+      --md-surface-2: #1f2430;
+      --md-text: #eceffd;
+      --md-muted: #a5acc4;
+      --md-primary: #95a3ff;
+      --md-primary-strong: #b0b9ff;
+      --md-outline: #2d3445;
+      --md-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
     }
 
     * { box-sizing: border-box; }
 
+    html, body { margin: 0; padding: 0; }
+
     body {
-      margin: 0;
       font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
-      background:
-        radial-gradient(1000px 600px at 10% -10%, rgba(93, 140, 255, 0.2), transparent 55%),
-        radial-gradient(900px 500px at 95% 0%, rgba(127, 107, 255, 0.2), transparent 55%),
-        var(--bg);
-      color: var(--text);
+      background: radial-gradient(circle at 15% -5%, color-mix(in srgb, var(--md-primary) 16%, transparent), transparent 45%), var(--md-bg);
+      color: var(--md-text);
       line-height: 1.65;
     }
 
     .container {
-      width: min(1120px, 92vw);
+      width: min(1140px, 92vw);
       margin: 0 auto;
     }
 
-    .hero {
-      padding: 76px 0 52px;
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid color-mix(in srgb, var(--md-outline) 70%, transparent);
+      background: color-mix(in srgb, var(--md-bg) 80%, transparent);
     }
 
-    .hero-card {
-      background: linear-gradient(135deg, rgba(93, 140, 255, 0.16), rgba(127, 107, 255, 0.12));
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      padding: 42px;
-      backdrop-filter: blur(6px);
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #cfe0ff;
-      background: rgba(93, 140, 255, 0.16);
-      border: 1px solid rgba(93, 140, 255, 0.45);
-      padding: 6px 12px;
-      border-radius: 999px;
-      margin-bottom: 16px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(30px, 4vw, 48px);
-      line-height: 1.2;
-      letter-spacing: 0.2px;
-    }
-
-    .title-row {
+    .topbar-inner {
+      min-height: 64px;
       display: flex;
       align-items: center;
-      gap: 14px;
-    }
-
-    .title-logo {
-      width: 112px;
-      height: 112px;
-      border-radius: 12px;
-      object-fit: contain;
-      background: rgba(10, 16, 32, 0.45);
-      border: 1px solid var(--border);
-      padding: 8px;
-      flex: 0 0 auto;
-    }
-
-    .subtitle {
-      margin: 18px 0 0;
-      max-width: 760px;
-      color: var(--muted);
-      font-size: clamp(16px, 2vw, 19px);
-    }
-
-    .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin: 22px 0 30px;
-    }
-
-    .chip {
-      border: 1px solid var(--border);
-      color: #d3dcf8;
-      background: rgba(16, 24, 48, 0.6);
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-    }
-
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
+      justify-content: space-between;
       gap: 12px;
     }
 
-    .btn {
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       text-decoration: none;
-      border-radius: 12px;
-      padding: 12px 18px;
+      color: inherit;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--md-outline);
+      background: var(--md-surface);
+      padding: 2px;
+    }
+
+    .icon-btn {
+      border: 1px solid var(--md-outline);
+      background: var(--md-surface);
+      color: var(--md-text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
       font-weight: 600;
-      border: 1px solid transparent;
-      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    .hero {
+      padding: 48px 0 24px;
+    }
+
+    .hero-card {
+      background: linear-gradient(145deg, color-mix(in srgb, var(--md-surface) 86%, var(--md-primary) 14%), var(--md-surface));
+      border: 1px solid var(--md-outline);
+      border-radius: 28px;
+      box-shadow: var(--md-shadow);
+      padding: 34px;
+    }
+
+    .badge-row,
+    .chips,
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge,
+    .chip {
+      border-radius: 999px;
+      border: 1px solid var(--md-outline);
+      background: var(--md-surface-2);
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--md-muted);
+    }
+
+    h1 {
+      margin: 12px 0 10px;
+      font-size: clamp(30px, 4.2vw, 50px);
+      line-height: 1.15;
+      letter-spacing: .2px;
+    }
+
+    .subtitle {
+      margin: 0 0 16px;
+      font-size: clamp(16px, 1.95vw, 20px);
+      color: var(--md-muted);
+      max-width: 860px;
+    }
+
+    .btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      text-decoration: none;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      padding: 11px 16px;
+      font-weight: 700;
+      transition: .2s ease;
     }
 
-    .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .btn:hover { transform: translateY(-1px); }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--primary), var(--primary-2));
       color: #fff;
-      box-shadow: 0 10px 25px rgba(93, 140, 255, 0.35);
+      background: linear-gradient(130deg, var(--md-primary), var(--md-primary-strong));
+      box-shadow: 0 8px 20px color-mix(in srgb, var(--md-primary) 35%, transparent);
     }
 
-    .btn-ghost {
-      color: #dbe4ff;
-      border-color: var(--border);
-      background: rgba(14, 20, 40, 0.52);
+    .btn-outline {
+      color: var(--md-text);
+      border-color: var(--md-outline);
+      background: var(--md-surface);
     }
 
     .section {
-      padding: 8px 0 30px;
+      padding: 20px 0;
     }
 
-    .section-title {
-      margin: 10px 0 16px;
-      font-size: clamp(24px, 3vw, 32px);
+    .section h2 {
+      margin: 0 0 8px;
+      font-size: clamp(24px, 3vw, 34px);
     }
 
-    .section-desc {
-      color: var(--muted);
-      margin: 0 0 24px;
-      max-width: 820px;
+    .section .desc {
+      margin: 0 0 18px;
+      color: var(--md-muted);
+      max-width: 860px;
     }
 
-    .grid {
+    .grid-3,
+    .grid-2,
+    .shot-grid {
       display: grid;
       gap: 14px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .shot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
     .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
+      background: var(--md-surface);
+      border: 1px solid var(--md-outline);
+      border-radius: var(--md-radius);
+      padding: 18px;
+      box-shadow: var(--md-shadow);
     }
 
     .card h3 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0 0 8px;
+      margin: 0 0 6px;
       font-size: 18px;
     }
 
     .card p {
       margin: 0;
-      color: var(--muted);
+      color: var(--md-muted);
       font-size: 15px;
     }
 
-    .panel-grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .panel-card {
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-      background: linear-gradient(180deg, rgba(21, 30, 58, 0.72), rgba(14, 21, 44, 0.78));
-    }
-
-    .panel-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .panel-head h3 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .ol {
       margin: 0;
-      font-size: 18px;
+      padding-left: 20px;
+      color: var(--md-muted);
     }
 
-    .panel-tag {
-      font-size: 12px;
-      color: #d8e2ff;
-      border: 1px solid rgba(120, 150, 230, 0.45);
-      background: rgba(93, 140, 255, 0.14);
-      border-radius: 999px;
-      padding: 4px 10px;
-      white-space: nowrap;
-    }
+    .ol li + li { margin-top: 6px; }
 
-    .panel-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .shot-grid {
-      display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .shot-card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
+    .shot {
       overflow: hidden;
-      background: rgba(13, 20, 42, 0.66);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      border-radius: 16px;
+      border: 1px solid var(--md-outline);
+      background: var(--md-surface);
+      box-shadow: var(--md-shadow);
     }
 
-    .shot-card img {
+    .shot img {
       width: 100%;
-      height: 170px;
+      height: 190px;
       object-fit: cover;
       display: block;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--md-outline);
     }
 
-    .shot-title {
+    .shot p {
       margin: 0;
       padding: 10px 12px;
       font-size: 14px;
-      color: #dce5ff;
-    }
-
-    .download-box {
-      margin-top: 8px;
-      background: linear-gradient(180deg, rgba(21, 29, 58, 0.85), rgba(16, 22, 45, 0.9));
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-    }
-
-    .download-grid {
-      margin-top: 14px;
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .dl-item {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      background: rgba(13, 20, 42, 0.66);
-    }
-
-    .dl-item h4 {
-      margin: 0 0 8px;
-      font-size: 16px;
-    }
-
-    .dl-item p {
-      margin: 0 0 12px;
-      color: var(--muted);
-      font-size: 14px;
-      min-height: 42px;
-    }
-
-    .dl-item a {
-      text-decoration: none;
-      color: #e8edff;
-      background: rgba(93, 140, 255, 0.18);
-      border: 1px solid rgba(93, 140, 255, 0.5);
-      border-radius: 10px;
-      padding: 8px 12px;
-      display: inline-block;
-      font-size: 14px;
-      font-weight: 600;
+      color: var(--md-muted);
     }
 
     footer {
-      padding: 24px 0 40px;
-      color: #8f9abc;
-      font-size: 13px;
+      padding: 26px 0 40px;
       text-align: center;
+      color: var(--md-muted);
+      font-size: 13px;
     }
 
     @media (max-width: 980px) {
-      .grid, .download-grid, .shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .panel-grid { grid-template-columns: 1fr; }
+      .grid-3, .shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-2 { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 680px) {
-      .hero-card { padding: 24px; border-radius: 18px; }
-      .grid, .download-grid, .shot-grid { grid-template-columns: 1fr; }
-      .title-logo { width: 88px; height: 88px; padding: 7px; }
+    @media (max-width: 640px) {
+      .hero-card { padding: 24px; border-radius: 20px; }
+      .grid-3, .shot-grid { grid-template-columns: 1fr; }
+      h1 { font-size: clamp(28px, 9vw, 38px); }
     }
   </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="container">
-      <div class="hero-card">
-        <span class="badge">🚀 OpenClaw Launcher · 图形化启动器</span>
-        <div class="title-row">
-          <img class="title-logo" src="./assets/logo.png" alt="OpenClaw Launcher Logo" />
-
-          <h1>让 OpenClaw 的安装与运行<br />更简单、更稳定、更专业</h1>
-        </div>
-        <p class="subtitle">
-          一款跨平台桌面启动器：安装、管理、排错、备份，一站完成。
-        </p>
-
-        <div class="hero-meta">
-          <span class="chip">Python 3.10+</span>
-          <span class="chip">PySide6</span>
-          <span class="chip">支持 macOS / Linux / Windows</span>
-          <span class="chip">MIT License</span>
-        </div>
-
-        <div class="cta-row">
-          <a class="btn btn-primary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">⬇️ 立即下载</a>
-          <a class="btn btn-ghost" href="https://github.com/shinnpuru/OpenClawLauncher" target="_blank" rel="noopener noreferrer">⭐ 查看源码仓库</a>
-        </div>
-      </div>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="https://github.com/shinnpuru/OpenClawLauncher" target="_blank" rel="noopener noreferrer">
+        <img src="./assets/logo.png" alt="OpenClaw Launcher Logo" />
+        <span>OpenClaw Launcher</span>
+      </a>
+      <button id="themeToggle" class="icon-btn" type="button" aria-label="切换主题">🌙 夜间模式</button>
     </div>
   </header>
 
   <main>
-    <section class="section">
+    <section class="hero">
       <div class="container">
-        <h2 class="section-title">核心功能</h2>
-        <p class="section-desc">少步骤、强可控、开箱即用。</p>
-
-        <div class="grid">
-          <article class="card">
-            <h3>🧩 多实例</h3>
-            <p>创建 / 启动 / 停止 / 删除。</p>
-          </article>
-
-          <article class="card">
-            <h3>📦 可视化安装</h3>
-            <p>自动下载并初始化。</p>
-          </article>
-
-          <article class="card">
-            <h3>✅ 依赖检测</h3>
-            <p>必需与可选依赖一目了然。</p>
-          </article>
-
-          <article class="card">
-            <h3>🧾 日志排错</h3>
-            <p>快速定位运行问题。</p>
-          </article>
-
-          <article class="card">
-            <h3>💾 备份恢复</h3>
-            <p>升级、迁移更安心。</p>
-          </article>
-
-          <article class="card">
-            <h3>⚙️ 运行配置</h3>
-            <p>环境变量与源配置可调。</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <h2 class="section-title">功能面板介绍</h2>
-        <p class="section-desc">按面板分工，流程清晰。</p>
-
-        <div class="panel-grid">
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>🩺 依赖面板</h3>
-              <span class="panel-tag">先检查</span>
-            </div>
-            <p>检查 Node.js / OpenClaw / Python / uv。</p>
-          </article>
-
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>🧱 实例面板</h3>
-              <span class="panel-tag">核心操作</span>
-            </div>
-            <p>实例全生命周期管理。</p>
-          </article>
-
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>📜 日志面板</h3>
-              <span class="panel-tag">问题定位</span>
-            </div>
-            <p>查看输出与错误，快速排查。</p>
-          </article>
-
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>🛟 备份面板</h3>
-              <span class="panel-tag">数据安全</span>
-            </div>
-            <p>打包归档与一键恢复。</p>
-          </article>
-
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>🎛️ 配置面板</h3>
-              <span class="panel-tag">灵活配置</span>
-            </div>
-            <p>环境变量与仓库来源设置。</p>
-          </article>
-
-          <article class="panel-card">
-            <div class="panel-head">
-              <h3>🧭 一站式流程</h3>
-              <span class="panel-tag">推荐路径</span>
-            </div>
-            <p>检查 → 创建 → 启动 → 日志 → 备份。</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="container">
-        <h2 class="section-title">下载与安装</h2>
-        <div class="download-box">
-          <p class="section-desc" style="margin-bottom: 6px;">
-            选择你的系统，立即下载：
-          </p>
-
-          <div class="download-grid">
-            <div class="dl-item">
-              <h4>🪟 Windows</h4>
-              <p>下载并安装。</p>
-              <a href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">下载 Windows 版本</a>
-            </div>
-
-            <div class="dl-item">
-              <h4>🍎 macOS</h4>
-              <p>下载后直接使用。</p>
-              <a href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">下载 macOS 版本</a>
-            </div>
-
-            <div class="dl-item">
-              <h4>🐧 Linux</h4>
-              <p>选择适配发行版包。</p>
-              <a href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">下载 Linux 版本</a>
-            </div>
+        <article class="hero-card">
+          <h1>本地 OpenClaw + 本地 LLM，一键可视化部署</h1>
+          <p class="subtitle">围绕本地化部署场景，从依赖准备、实例管理到 LlamaCPP 与模型切换，全流程图形化可控。</p>
+          <div class="chips" style="margin-bottom:14px;">
+            <span class="chip">macOS / Windows</span>
+            <span class="chip">MIT License</span>
           </div>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">⬇ 进入 Releases</a>
+            <a class="btn btn-outline" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">📘 查看 Wiki</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>核心功能</h2>
+        <p class="desc"></p>
+        <div class="grid-3">
+          <article class="card"><h3>🏁 引导式上手</h3><p>六步完成初始化：依赖安装、实例创建、模型配置、频道配置、启动实例、打开 WebUI。</p></article>
+          <article class="card"><h3>🧱 实例管理</h3><p>创建 / 启动 / 停止 / 删除，支持更新前自动备份、打开实例目录和 CLI。</p></article>
+          <article class="card"><h3>🩺 运行时管理</h3><p>管理 OpenClaw / Node.js（必需）与 Python / uv（可选）版本，支持下载和默认切换。</p></article>
+          <article class="card"><h3>🛰 频道配置</h3><p>按实例维护 Discord、Telegram、Feishu、DingTalk、QQ 等参数，保存前支持停机检查。</p></article>
+          <article class="card"><h3>🧠 模型与 LlamaCPP</h3><p>本地 GGUF 推理服务 + 在线/本地提供商切换（OpenAI、DeepSeek、Moonshot、Ollama、Llama.cpp）。</p></article>
+          <article class="card"><h3>🧩 插件与备份</h3><p>插件安装/卸载、推荐插件一键安装；zip 备份与恢复后自动尝试重装依赖。</p></article>
         </div>
       </div>
     </section>
 
     <section class="section">
       <div class="container">
-        <h2 class="section-title">界面截图</h2>
+        <h2>快速开始</h2>
+        <p class="desc">与 README 保持一致：下载 → 安装 → 进入快速上手面板。</p>
+        <div class="grid-2">
+          <article class="card">
+            <h3>1) 下载与安装</h3>
+            <ol class="ol">
+              <li>进入 Releases 下载适配系统的安装包（macOS / Windows）。</li>
+              <li>macOS 将 .app 放入“应用程序”；Windows 直接运行 .exe。</li>
+              <li>首次启动建议进入“快速上手”面板。</li>
+            </ol>
+          </article>
+          <article class="card">
+            <h3>2) 初始化</h3>
+            <ol class="ol">
+              <li>先在确认 Node.js / OpenClaw 依赖状态，然后创建实例。</li>
+              <li>在“LlamaCPP + 模型切换”完成本地或在线模型配置。</li>
+              <li>配置频道后运行实例，最后在日志与备份面板做运行保障。</li>
+            </ol>
+          </article>
+        </div>
+      </div>
+    </section>
 
+    <section class="section">
+      <div class="container">
+        <h2>面板截图</h2>
+        <p class="desc"></p>
         <div class="shot-grid">
-          <article class="shot-card">
-            <img src="./assets/onboard.png" alt="Onboard 面板截图" loading="lazy" />
-            <p class="shot-title">🏁 引导面板</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/env.png" alt="依赖环境面板截图" loading="lazy" />
-            <p class="shot-title">🩺 环境依赖</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/instance.png" alt="实例面板截图" loading="lazy" />
-            <p class="shot-title">🧱 实例管理</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/log.png" alt="日志面板截图" loading="lazy" />
-            <p class="shot-title">📜 日志查看</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/backup.png" alt="备份面板截图" loading="lazy" />
-            <p class="shot-title">🛟 备份恢复</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/advanced.png" alt="高级配置面板截图" loading="lazy" />
-            <p class="shot-title">🎛️ 高级配置</p>
-          </article>
-          <article class="shot-card">
-            <img src="./assets/plugin.png" alt="插件面板截图" loading="lazy" />
-            <p class="shot-title">🧩 插件管理</p>
-          </article>
+          <article class="shot"><img src="./assets/onboard.png" alt="快速上手" loading="lazy" /><p>快速上手</p></article>
+          <article class="shot"><img src="./assets/channels.png" alt="频道配置" loading="lazy" /><p>频道配置</p></article>
+          <article class="shot"><img src="./assets/llamacpp.png" alt="LlamaCPP" loading="lazy" /><p>LlamaCPP</p></article>
+          <article class="shot"><img src="./assets/models.png" alt="模型切换" loading="lazy" /><p>模型切换</p></article>
+          <article class="shot"><img src="./assets/instance.png" alt="实例管理" loading="lazy" /><p>实例管理</p></article>
+          <article class="shot"><img src="./assets/env.png" alt="依赖检查" loading="lazy" /><p>依赖检查</p></article>
+          <article class="shot"><img src="./assets/backup.png" alt="备份管理" loading="lazy" /><p>备份管理</p></article>
+          <article class="shot"><img src="./assets/log.png" alt="日志查看" loading="lazy" /><p>日志查看</p></article>
+          <article class="shot"><img src="./assets/plugin.png" alt="插件管理" loading="lazy" /><p>插件管理</p></article>
+          <article class="shot"><img src="./assets/advanced.png" alt="高级设置" loading="lazy" /><p>高级设置</p></article>
         </div>
       </div>
     </section>
@@ -522,5 +352,34 @@
   <footer>
     OpenClaw Launcher © Shinnpuru 2026
   </footer>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const button = document.getElementById('themeToggle');
+      const key = 'ocl-theme';
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const saved = localStorage.getItem(key);
+      const initTheme = saved || (prefersDark ? 'dark' : 'light');
+
+      function applyTheme(theme) {
+        if (theme === 'dark') {
+          root.setAttribute('data-theme', 'dark');
+          button.textContent = '☀ 白天模式';
+        } else {
+          root.removeAttribute('data-theme');
+          button.textContent = '🌙 夜间模式';
+        }
+      }
+
+      applyTheme(initTheme);
+
+      button.addEventListener('click', function () {
+        const nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        localStorage.setItem(key, nextTheme);
+        applyTheme(nextTheme);
+      });
+    })();
+  </script>
 </body>
 </html>
