@@ -508,7 +508,7 @@ class InstancePanel(QWidget):
         port = InstallManager.get_instance_port(instance_path)
         gateway_token = InstallManager.get_instance_gateway_token(instance_path, name)
         query = urlencode({"token": gateway_token})
-        url = f"http://127.0.0.1:{port}/?{query}"
+        url = f"http://127.0.0.1:{port}/#{query}"
         QDesktopServices.openUrl(QUrl(url))
         self.status_label.setText(i18n.t("msg_open_webui", name=name, url=url))
 
