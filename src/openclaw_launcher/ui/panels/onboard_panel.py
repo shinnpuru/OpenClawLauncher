@@ -453,7 +453,7 @@ class OnboardPanel(QWidget):
         instance_path = Config.get_instance_path(self.SAMPLE_INSTANCE_NAME)
         port = InstallManager.get_instance_port(instance_path)
         gateway_token = InstallManager.get_instance_gateway_token(instance_path, self.SAMPLE_INSTANCE_NAME)
-        url = QUrl(f"http://127.0.0.1:{port}/?token={gateway_token}")
+        url = QUrl(f"http://127.0.0.1:{port}/#token={gateway_token}")
         QDesktopServices.openUrl(url)
         self.lbl_status.setText(i18n.t("onboard_msg_webui_opened", url=url.toString()))
 
