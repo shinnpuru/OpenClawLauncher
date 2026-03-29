@@ -779,7 +779,7 @@ store-dir=../../.pnpm-store
                             "api": "openai-completions",
                             "reasoning": False,
                             "input": [
-                                "text"
+                                "text","image"
                             ],
                             "cost": {
                                 "input": 0,
@@ -802,6 +802,9 @@ store-dir=../../.pnpm-store
         defaults_config = {
             "workspace": "",
             "model": {
+                "primary": "llamacpp/local-model"
+            },
+            "imageModel": {
                 "primary": "llamacpp/local-model"
             },
             "models": {
