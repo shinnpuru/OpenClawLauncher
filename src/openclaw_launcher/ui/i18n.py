@@ -49,16 +49,16 @@ class I18nManager(QObject):
             Config.set_language(lang)
             self.language_changed.emit(lang)
 
-    def t(self, key: str, **kwargs) -> str:
+    def t(self, translation_key: str, **kwargs) -> str:
         """Get translated string."""
         # Try current language
         lang_data = self._translations.get(self._current_lang, {})
-        text = lang_data.get(key)
+        text = lang_data.get(translation_key)
         
         # Fallback to English if not found
         if text is None:
-             lang_data = self._translations.get("en", {})
-             text = lang_data.get(key, key) # Fallback to key if even English is missing
+            lang_data = self._translations.get("en", {})
+            text = lang_data.get(translation_key, translation_key) # Fallback to key if even English is missing
         
         if kwargs:
             try:
