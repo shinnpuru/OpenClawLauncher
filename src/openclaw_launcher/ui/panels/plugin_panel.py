@@ -5,6 +5,7 @@ import os
 import stat
 import time
 import json
+from datetime import datetime
 
 from PySide6.QtCore import QThread, Signal, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -40,44 +41,74 @@ class PluginInstallWorker(QThread):
         self.instance_name = instance_name
 
     def run(self):
+        log_file_path = Config.get_log_file(self.instance_name)
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
-            if ProcessManager.get_status(self.instance_name) == "Running":
-                raise RuntimeError(i18n.t("msg_plugin_install_requires_stopped_instance"))
+            with open(log_file_path, "a", encoding="utf-8", buffering=1) as log_file:
+                log_file.write("\n===== Plugin install started =====\n")
+                log_file.write(f"time: {datetime.now().isoformat(timespec='seconds')}\n")
+                log_file.write(f"instance: {self.instance_name}\n")
+                log_file.write(f"plugin: {self.plugin_name}\n")
 
-            env = InstallManager.get_runtime_env(
-                instance_path=self.openclaw_home,
-                instance_name=self.instance_name,
-            )
-            try:
-                node_cmd = InstallManager.resolve_runtime_tool(env, "node")
-            except FileNotFoundError:
-                raise RuntimeError(i18n.t("msg_plugin_node_not_found"))
+                if ProcessManager.get_status(self.instance_name) == "Running":
+                    raise RuntimeError(i18n.t("msg_plugin_install_requires_stopped_instance"))
 
-            command = [
-                node_cmd,
-                "openclaw.mjs",
-                "plugins",
-                "install",
-                self.plugin_name,
-            ]
-            result = subprocess.run(
-                command,
-                cwd=str(self.openclaw_home),
-                env=env,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+                env = InstallManager.get_runtime_env(
+                    instance_path=self.openclaw_home,
+                    instance_name=self.instance_name,
+                )
+                try:
+                    node_cmd = InstallManager.resolve_runtime_tool(env, "node")
+                except FileNotFoundError:
+                    raise RuntimeError(i18n.t("msg_plugin_node_not_found"))
 
-            output = (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
-            output = output.strip()
+                command = [
+                    node_cmd,
+                    "openclaw.mjs",
+                    "plugins",
+                    "install",
+                    self.plugin_name,
+                ]
+                log_file.write(f"cwd: {self.openclaw_home}\n")
+                log_file.write(f"command: {' '.join(command)}\n")
 
-            if result.returncode != 0:
-                msg = output or i18n.t("msg_plugin_install_failed_unknown")
-                raise RuntimeError(msg)
+                captured_lines = []
+                process = subprocess.Popen(
+                    command,
+                    cwd=str(self.openclaw_home),
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                )
 
-            self.completed.emit(output)
+                if process.stdout is not None:
+                    for raw_line in process.stdout:
+                        log_file.write(raw_line)
+                        line = raw_line.rstrip("\r\n")
+                        if line:
+                            captured_lines.append(line)
+
+                return_code = process.wait()
+                output = "\n".join(captured_lines).strip()
+
+                if return_code != 0:
+                    msg = output or i18n.t("msg_plugin_install_failed_unknown")
+                    log_file.write(f"Plugin install failed (exit={return_code}): {msg}\n")
+                    log_file.write("===== Plugin install failed =====\n")
+                    raise RuntimeError(msg)
+
+                log_file.write("===== Plugin install completed =====\n")
+                self.completed.emit(output)
         except Exception as e:
+            try:
+                with open(log_file_path, "a", encoding="utf-8", buffering=1) as log_file:
+                    log_file.write(f"Plugin install exception: {e}\n")
+                    log_file.write("===== Plugin install aborted =====\n")
+            except Exception:
+                pass
             self.error.emit(str(e))
 
 
