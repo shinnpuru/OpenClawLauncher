@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout,
-    QLineEdit, QComboBox, QGroupBox, QMessageBox,
+    QLineEdit, QComboBox, QGroupBox, QMessageBox, QCheckBox,
     QProgressDialog, QTabWidget
 )
 from PySide6.QtCore import Qt, QThread, Signal
@@ -159,6 +159,12 @@ class ModelSwitchWorker(QThread):
         api_key = self.config.get("api_key", "")
         model_id = self.config.get("model_id", provider_info.get("default_model", ""))
         model_name = self.config.get("model_name", model_id)
+        use_vision_input = bool(self.config.get("use_vision_input", False))
+        model_ref = f"{self.provider_key}/{model_id}"
+
+        model_inputs = ["text"]
+        if use_vision_input:
+            model_inputs.append("image")
 
         # 构建 providers 配置
         providers_config = {
@@ -173,7 +179,7 @@ class ModelSwitchWorker(QThread):
                         "name": model_name,
                         "api": "openai-completions",
                         "reasoning": False,
-                        "input": ["text"],
+                        "input": model_inputs,
                         "cost": {
                             "input": 0,
                             "output": 0,
@@ -208,11 +214,15 @@ class ModelSwitchWorker(QThread):
             defaults_config = {}
 
         defaults_config["model"] = {
-            "primary": f"{self.provider_key}/{model_id}"
+            "primary": model_ref
         }
         defaults_config["models"] = {
-            f"{self.provider_key}/{model_id}": {}
+            model_ref: {}
         }
+        if use_vision_input:
+            defaults_config["imageModel"] = {
+                "primary": model_ref
+            }
 
         agents_obj["defaults"] = defaults_config
         config_data["agents"] = agents_obj
@@ -339,6 +349,11 @@ class ModelSwitchTab(QWidget):
         model_name_layout.addWidget(self.model_name_edit)
 
         config_layout.addLayout(model_name_layout)
+
+        # Vision input toggle
+        self.vision_input_checkbox = QCheckBox(i18n.t("model_switch_use_vision_input"))
+        self.vision_input_checkbox.setChecked(False)
+        config_layout.addWidget(self.vision_input_checkbox)
 
         layout.addWidget(self.config_group)
 
@@ -538,6 +553,7 @@ class ModelSwitchTab(QWidget):
             "api_key": api_key,
             "model_id": model_id,
             "model_name": model_name,
+            "use_vision_input": self.vision_input_checkbox.isChecked(),
         }
         self.save_config(provider_key, config)
 
@@ -681,6 +697,7 @@ class ModelSwitchTab(QWidget):
                 self.api_key_edit.setText(config.get("api_key", ""))
                 self.model_id_edit.setText(config.get("model_id", ""))
                 self.model_name_edit.setText(config.get("model_name", ""))
+                self.vision_input_checkbox.setChecked(bool(config.get("use_vision_input", False)))
 
     def update_ui_texts(self):
         """Update UI texts (when language changes)"""
@@ -700,6 +717,7 @@ class ModelSwitchTab(QWidget):
         self.model_id_edit.setPlaceholderText(i18n.t("model_switch_model_id_placeholder"))
         self.model_name_label.setText(i18n.t("model_switch_model_name"))
         self.model_name_edit.setPlaceholderText(i18n.t("model_switch_model_name_placeholder"))
+        self.vision_input_checkbox.setText(i18n.t("model_switch_use_vision_input"))
 
         self.test_api_btn.setText(i18n.t("model_switch_test_api"))
         self.apply_btn.setText(i18n.t("model_switch_apply"))

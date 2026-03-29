@@ -560,9 +560,6 @@ class InstallManager:
         for key, value in env_entries.items():
             preserved_lines.append(f"{key}={value}")
 
-        (instance_path / "config").mkdir(parents=True, exist_ok=True)
-        (instance_path / "workspace").mkdir(parents=True, exist_ok=True)
-
         env_file.write_text("\n".join(preserved_lines).rstrip() + "\n", encoding="utf-8")
         return env
 
@@ -803,7 +800,7 @@ store-dir=../../.pnpm-store
             agents_obj = {}
 
         defaults_config = {
-            "workspace": ".openclaw/workspace-openclaw",
+            "workspace": "",
             "model": {
                 "primary": "llamacpp/local-model"
             },

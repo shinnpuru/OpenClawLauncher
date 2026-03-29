@@ -35,12 +35,14 @@ class LlamaCppProcessWorker(QThread):
     def __init__(
         self,
         model_path: str,
+        mmproj_path: str = "",
         port: int = 8989,
         n_gpu_layers: int = 100,
         extra_params: str = "",
     ):
         super().__init__()
         self.model_path = model_path
+        self.mmproj_path = mmproj_path
         self.port = port
         self.n_gpu_layers = n_gpu_layers
         self.extra_params = extra_params
@@ -63,6 +65,10 @@ class LlamaCppProcessWorker(QThread):
                 "-ngl",
                 str(self.n_gpu_layers),
             ]
+
+            mmproj_path = self.mmproj_path.strip()
+            if mmproj_path:
+                cmd.extend(["--mmproj", mmproj_path])
 
             if self.extra_params.strip():
                 cmd.extend(self.extra_params.strip().split())
@@ -166,19 +172,36 @@ class LlamaCppTab(QWidget):
         self.refresh_model_list()
         model_file_layout.addWidget(self.model_combo)
 
-        self.refresh_models_btn = QPushButton(i18n.t("btn_refresh"))
-        self.refresh_models_btn.clicked.connect(self.refresh_model_list)
-        model_file_layout.addWidget(self.refresh_models_btn)
-
         self.browse_model_btn = QPushButton(i18n.t("btn_browse"))
         self.browse_model_btn.clicked.connect(self.browse_model_file)
         model_file_layout.addWidget(self.browse_model_btn)
 
         config_layout.addLayout(model_file_layout)
 
+        mmproj_file_layout = QHBoxLayout()
+        self.mmproj_file_label = QLabel(i18n.t("llamacpp_mmproj_file"))
+        mmproj_file_layout.addWidget(self.mmproj_file_label)
+
+        self.mmproj_combo = QComboBox()
+        self.mmproj_combo.setEditable(True)
+        mmproj_file_layout.addWidget(self.mmproj_combo)
+
+        self.browse_mmproj_btn = QPushButton(i18n.t("btn_browse"))
+        self.browse_mmproj_btn.clicked.connect(self.browse_mmproj_file)
+        mmproj_file_layout.addWidget(self.browse_mmproj_btn)
+
+        config_layout.addLayout(mmproj_file_layout)
+        self.refresh_model_list()
+
+        model_actions_layout = QHBoxLayout()
+        self.refresh_models_btn = QPushButton(i18n.t("btn_refresh"))
+        self.refresh_models_btn.clicked.connect(self.refresh_model_list)
+        model_actions_layout.addWidget(self.refresh_models_btn)
+
         self.open_model_dir_btn = QPushButton(i18n.t("llamacpp_open_model_dir"))
         self.open_model_dir_btn.clicked.connect(self.open_model_directory)
-        config_layout.addWidget(self.open_model_dir_btn)
+        model_actions_layout.addWidget(self.open_model_dir_btn)
+        config_layout.addLayout(model_actions_layout)
 
         port_layout = QHBoxLayout()
         self.port_label = QLabel(i18n.t("llamacpp_port"))
@@ -272,7 +295,13 @@ class LlamaCppTab(QWidget):
 
     def refresh_model_list(self):
         """Refresh the list of available .gguf models."""
+        current_model = self.model_combo.currentText().strip()
+        current_mmproj = self.mmproj_combo.currentText().strip() if hasattr(self, "mmproj_combo") else ""
+
         self.model_combo.clear()
+        if hasattr(self, "mmproj_combo"):
+            self.mmproj_combo.clear()
+            self.mmproj_combo.addItem("")
 
         llama_dir = Path.cwd() / "llama"
         models = []
@@ -284,8 +313,15 @@ class LlamaCppTab(QWidget):
 
         if models:
             self.model_combo.addItems(models)
+            if hasattr(self, "mmproj_combo"):
+                self.mmproj_combo.addItems(models)
         else:
             self.model_combo.addItem(i18n.t("llamacpp_no_models_found"))
+
+        if current_model:
+            self.model_combo.setCurrentText(current_model)
+        if hasattr(self, "mmproj_combo") and current_mmproj:
+            self.mmproj_combo.setCurrentText(current_mmproj)
 
     def browse_model_file(self):
         """Open file dialog to select a .gguf model file."""
@@ -297,6 +333,27 @@ class LlamaCppTab(QWidget):
         )
         if file_path:
             self.model_combo.setCurrentText(file_path)
+
+    def browse_mmproj_file(self):
+        """Open file dialog to select a .gguf mmproj file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            i18n.t("llamacpp_select_mmproj"),
+            str(Path.cwd() / "llama"),
+            i18n.t("llamacpp_model_file_filter"),
+        )
+        if file_path:
+            self.mmproj_combo.setCurrentText(file_path)
+
+    def _resolve_gguf_path(self, file_text: str) -> Optional[Path]:
+        file_text = (file_text or "").strip()
+        if not file_text:
+            return None
+
+        llama_dir = Path.cwd() / "llama"
+        if Path(file_text).is_absolute():
+            return Path(file_text)
+        return llama_dir / file_text
 
     def open_model_directory(self):
         """Open the llama models directory."""
@@ -327,14 +384,19 @@ class LlamaCppTab(QWidget):
             QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("llamacpp_no_model_selected"))
             return
 
-        llama_dir = Path.cwd() / "llama"
-        if not Path(model_path).is_absolute():
-            model_full_path = llama_dir / model_path
-        else:
-            model_full_path = Path(model_path)
+        model_full_path = self._resolve_gguf_path(model_path)
+        if not model_full_path:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("llamacpp_no_model_selected"))
+            return
 
         if not model_full_path.exists():
             QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("llamacpp_model_not_found"))
+            return
+
+        mmproj_path = self.mmproj_combo.currentText()
+        mmproj_full_path = self._resolve_gguf_path(mmproj_path)
+        if mmproj_full_path and not mmproj_full_path.exists():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("llamacpp_mmproj_not_found"))
             return
 
         port = self.port_spin.value()
@@ -346,6 +408,7 @@ class LlamaCppTab(QWidget):
 
         self.worker = LlamaCppProcessWorker(
             model_path=str(model_full_path),
+            mmproj_path=str(mmproj_full_path) if mmproj_full_path else "",
             port=port,
             n_gpu_layers=gpu_layers,
             extra_params=extra_params,
@@ -429,6 +492,7 @@ class LlamaCppTab(QWidget):
         """Save current configuration."""
         config = {
             "model": self.model_combo.currentText(),
+            "mmproj_model": self.mmproj_combo.currentText(),
             "port": self.port_spin.value(),
             "gpu_layers": self.gpu_layers_spin.value(),
             "extra_params": self.extra_params.toPlainText(),
@@ -446,6 +510,14 @@ class LlamaCppTab(QWidget):
                     self.model_combo.setCurrentIndex(index)
                 else:
                     self.model_combo.setCurrentText(model)
+
+            mmproj_model = config.get("mmproj_model", "")
+            if mmproj_model:
+                index = self.mmproj_combo.findText(mmproj_model)
+                if index >= 0:
+                    self.mmproj_combo.setCurrentIndex(index)
+                else:
+                    self.mmproj_combo.setCurrentText(mmproj_model)
 
             port = config.get("port", 8989)
             self.port_spin.setValue(port)
@@ -469,8 +541,10 @@ class LlamaCppTab(QWidget):
         self.config_group.setTitle(i18n.t("llamacpp_model_group"))
         self.runtime_group.setTitle(i18n.t("llamacpp_runtime_group"))
         self.model_file_label.setText(i18n.t("llamacpp_model_file"))
+        self.mmproj_file_label.setText(i18n.t("llamacpp_mmproj_file"))
         self.refresh_models_btn.setText(i18n.t("btn_refresh"))
         self.browse_model_btn.setText(i18n.t("btn_browse"))
+        self.browse_mmproj_btn.setText(i18n.t("btn_browse"))
         self.open_model_dir_btn.setText(i18n.t("llamacpp_open_model_dir"))
 
         self.port_label.setText(i18n.t("llamacpp_port"))
