@@ -10,6 +10,7 @@ from .panels.backup_panel import BackupPanel
 from .panels.log_panel import LogPanel
 from .panels.advanced_panel import AdvancedPanel
 from .panels.plugin_panel import PluginPanel
+from .panels.env_var_panel import EnvVarPanel
 from .panels.channel_config_panel import ChannelConfigPanel
 from .panels.ai_model_panel import LlamaCppTab, ModelSwitchTab
 from ..core.config import Config
@@ -148,6 +149,7 @@ class MainWindow(QMainWindow):
         self.backup_panel = BackupPanel()
         self.log_panel = LogPanel()
         self.plugin_panel = PluginPanel()
+        self.env_var_panel = EnvVarPanel()
         self.channel_config_panel = ChannelConfigPanel()
         self.advanced_panel = AdvancedPanel()
         self.llamacpp_panel = LlamaCppTab(self)
@@ -165,6 +167,7 @@ class MainWindow(QMainWindow):
             "backups": self.backup_panel,
             "logs": self.log_panel,
             "plugins": self.plugin_panel,
+            "env_vars": self.env_var_panel,
             "channels": self.channel_config_panel,
             "llamacpp": self.llamacpp_panel,
             "model_switch": self.model_switch_panel,
@@ -204,6 +207,7 @@ class MainWindow(QMainWindow):
             ],
             i18n.t("sidebar_section_data"): [
                 (i18n.t("tab_instances"), "instances"),
+                (i18n.t("tab_instance_env"), "env_vars"),
                 (i18n.t("tab_dependencies"), "dependencies"),
                 (i18n.t("tab_backups"), "backups"),
             ],
@@ -270,7 +274,7 @@ class MainWindow(QMainWindow):
     def on_language_changed(self, lang):
         self.update_ui_texts()
         # Propagate to panels if they have update_ui_texts method
-        for panel in [self.onboard_panel, self.instance_panel, self.dependency_panel, self.backup_panel, self.log_panel, self.plugin_panel, self.channel_config_panel, self.llamacpp_panel, self.model_switch_panel, self.advanced_panel]:
+        for panel in [self.onboard_panel, self.instance_panel, self.dependency_panel, self.backup_panel, self.log_panel, self.plugin_panel, self.env_var_panel, self.channel_config_panel, self.llamacpp_panel, self.model_switch_panel, self.advanced_panel]:
             if hasattr(panel, 'update_ui_texts'):
                 panel.update_ui_texts()
 
@@ -370,7 +374,7 @@ class MainWindow(QMainWindow):
             worker.wait(1000)
         self._update_check_worker = None
 
-        for panel in [self.onboard_panel, self.instance_panel, self.dependency_panel, self.backup_panel, self.log_panel, self.plugin_panel, self.channel_config_panel, self.llamacpp_panel, self.model_switch_panel, self.advanced_panel]:
+        for panel in [self.onboard_panel, self.instance_panel, self.dependency_panel, self.backup_panel, self.log_panel, self.plugin_panel, self.env_var_panel, self.channel_config_panel, self.llamacpp_panel, self.model_switch_panel, self.advanced_panel]:
             shutdown = getattr(panel, "shutdown", None)
             if callable(shutdown):
                 try:

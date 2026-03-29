@@ -338,6 +338,72 @@ class InstallManager:
         return entries
 
     @classmethod
+    def get_instance_env_entries(cls, instance_path: Path) -> dict:
+        """Return parsed .env.local entries for an instance."""
+        return cls._read_instance_env_entries(instance_path)
+
+    @classmethod
+    def set_instance_env_entry(cls, instance_path: Path, key: str, value: str):
+        """Create or update a single environment variable in .env.local."""
+        normalized_key = str(key or "").strip()
+        if not normalized_key or "=" in normalized_key:
+            raise ValueError("Invalid environment variable key")
+
+        env_file = instance_path / ".env.local"
+        existing_lines = []
+        if env_file.exists():
+            existing_lines = env_file.read_text(encoding="utf-8").splitlines()
+
+        updated_lines = []
+        matched = False
+        for line in existing_lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                updated_lines.append(line)
+                continue
+
+            existing_key = stripped.split("=", 1)[0].strip()
+            if existing_key == normalized_key:
+                if not matched:
+                    updated_lines.append(f"{normalized_key}={value}")
+                    matched = True
+                continue
+
+            updated_lines.append(line)
+
+        if not matched:
+            updated_lines.append(f"{normalized_key}={value}")
+
+        env_file.write_text("\n".join(updated_lines).rstrip() + "\n", encoding="utf-8")
+
+    @classmethod
+    def delete_instance_env_entry(cls, instance_path: Path, key: str):
+        """Delete a single environment variable from .env.local."""
+        normalized_key = str(key or "").strip()
+        if not normalized_key:
+            return
+
+        env_file = instance_path / ".env.local"
+        if not env_file.exists():
+            return
+
+        existing_lines = env_file.read_text(encoding="utf-8").splitlines()
+        updated_lines = []
+        for line in existing_lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                updated_lines.append(line)
+                continue
+
+            existing_key = stripped.split("=", 1)[0].strip()
+            if existing_key == normalized_key:
+                continue
+
+            updated_lines.append(line)
+
+        env_file.write_text("\n".join(updated_lines).rstrip() + "\n", encoding="utf-8")
+
+    @classmethod
     def get_instance_gateway_token(cls, instance_path: Path, instance_name: str) -> str:
         token = cls._read_instance_env_value(instance_path, "OPENCLAW_GATEWAY_TOKEN")
         if token:
