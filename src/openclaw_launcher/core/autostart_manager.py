@@ -38,6 +38,10 @@ class AutoStartManager:
     @classmethod
     def _command_line(cls) -> str:
         args = cls._program_arguments()
+        if cls._platform() == "Windows":
+            # Windows Run registry expects a Windows-compatible command line.
+            # shlex.quote() generates POSIX quoting, which may break paths with spaces.
+            return subprocess.list2cmdline(args)
         return " ".join(shlex.quote(part) for part in args)
 
     @classmethod
