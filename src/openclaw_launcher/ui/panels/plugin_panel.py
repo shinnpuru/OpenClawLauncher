@@ -1,9 +1,5 @@
 from pathlib import Path
-import shutil
 import subprocess
-import os
-import stat
-import time
 import json
 from datetime import datetime
 
@@ -116,41 +112,90 @@ class PluginUninstallWorker(QThread):
     finished = Signal(str, bool, str)
     error = Signal(str, str, str)
 
-    def __init__(self, plugin_path: Path):
+    def __init__(
+        self,
+        openclaw_home: Path,
+        instance_name: str,
+        plugin_name: str,
+        plugin_path: Path,
+    ):
         super().__init__()
+        self.openclaw_home = openclaw_home
+        self.instance_name = instance_name
+        self.plugin_name = plugin_name
         self.plugin_path = plugin_path
 
     def run(self):
-        plugin_name = self.plugin_path.name
+        log_file_path = Config.get_log_file(self.instance_name)
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
-            if self.plugin_path.exists() and self.plugin_path.is_dir():
-                self._remove_dir_with_retries(self.plugin_path)
+            with open(log_file_path, "a", encoding="utf-8", buffering=1) as log_file:
+                log_file.write("\n===== Plugin uninstall started =====\n")
+                log_file.write(f"time: {datetime.now().isoformat(timespec='seconds')}\n")
+                log_file.write(f"instance: {self.instance_name}\n")
+                log_file.write(f"plugin: {self.plugin_name}\n")
 
-            self.finished.emit(plugin_name, self.plugin_path.exists(), str(self.plugin_path))
+                if ProcessManager.get_status(self.instance_name) == "Running":
+                    raise RuntimeError(i18n.t("msg_plugin_install_requires_stopped_instance"))
+
+                env = InstallManager.get_runtime_env(
+                    instance_path=self.openclaw_home,
+                    instance_name=self.instance_name,
+                )
+                try:
+                    node_cmd = InstallManager.resolve_runtime_tool(env, "node")
+                except FileNotFoundError:
+                    raise RuntimeError(i18n.t("msg_plugin_node_not_found"))
+
+                command = [
+                    node_cmd,
+                    "openclaw.mjs",
+                    "plugins",
+                    "uninstall",
+                    self.plugin_name,
+                ]
+                log_file.write(f"cwd: {self.openclaw_home}\n")
+                log_file.write(f"command: {' '.join(command)}\n")
+
+                captured_lines = []
+                process = subprocess.Popen(
+                    command,
+                    cwd=str(self.openclaw_home),
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    bufsize=1,
+                )
+
+                if process.stdout is not None:
+                    for raw_line in process.stdout:
+                        log_file.write(raw_line)
+                        line = raw_line.rstrip("\r\n")
+                        if line:
+                            captured_lines.append(line)
+
+                return_code = process.wait()
+                output = "\n".join(captured_lines).strip()
+
+                if return_code != 0:
+                    msg = output or i18n.t("msg_uninstall_failed", name=self.plugin_name, error="unknown")
+                    log_file.write(f"Plugin uninstall failed (exit={return_code}): {msg}\n")
+                    log_file.write("===== Plugin uninstall failed =====\n")
+                    raise RuntimeError(msg)
+
+                log_file.write("===== Plugin uninstall completed =====\n")
+
+            self.finished.emit(self.plugin_name, self.plugin_path.exists(), str(self.plugin_path))
         except Exception as e:
-            self.error.emit(plugin_name, str(e), str(self.plugin_path))
-
-    def _remove_dir_with_retries(self, target_dir: Path, retries: int = 5, delay: float = 0.2):
-        def _onerror(func, path, exc_info):
             try:
-                os.chmod(path, stat.S_IWRITE)
-                func(path)
+                with open(log_file_path, "a", encoding="utf-8", buffering=1) as log_file:
+                    log_file.write(f"Plugin uninstall exception: {e}\n")
+                    log_file.write("===== Plugin uninstall aborted =====\n")
             except Exception:
                 pass
-
-        last_error = None
-        for attempt in range(retries):
-            try:
-                if target_dir.exists():
-                    shutil.rmtree(target_dir, onerror=_onerror)
-                return
-            except Exception as e:
-                last_error = e
-                if attempt < retries - 1:
-                    time.sleep(delay)
-
-        if last_error:
-            raise last_error
+            self.error.emit(self.plugin_name, str(e), str(self.plugin_path))
 
 
 class PluginPanel(QWidget):
@@ -160,8 +205,8 @@ class PluginPanel(QWidget):
             "url": "https://github.com/DingTalk-Real-AI/dingtalk-openclaw-connector",
         },
         {
-            "name": "@sliverp/qqbot",
-            "url": "https://github.com/sliverp/qqbot",
+            "name": "@tencent-connect/openclaw-qqbot",
+            "url": "https://github.com/tencent-connect/openclaw-qqbot",
         },
     ]
 
@@ -369,10 +414,30 @@ class PluginPanel(QWidget):
             found = False
             for child in sorted(source_dir.iterdir(), key=lambda p: p.name.lower()):
                 if child.is_dir():
-                    plugin_item = QTreeWidgetItem(["", child.name, ""])
-                    source_item.addChild(plugin_item)
-                    self._add_uninstall_button(plugin_item, child)
-                    found = True
+                    if child.name.startswith("@"):
+                        scoped_found = False
+                        for scoped_child in sorted(child.iterdir(), key=lambda p: p.name.lower()):
+                            if not scoped_child.is_dir():
+                                continue
+                            plugin_name = f"{child.name}/{scoped_child.name}"
+                            plugin_item = QTreeWidgetItem(["", plugin_name, ""])
+                            source_item.addChild(plugin_item)
+                            self._add_uninstall_button(plugin_item, plugin_name, scoped_child)
+                            found = True
+                            scoped_found = True
+
+                        if not scoped_found:
+                            plugin_name = child.name
+                            plugin_item = QTreeWidgetItem(["", plugin_name, ""])
+                            source_item.addChild(plugin_item)
+                            self._add_uninstall_button(plugin_item, plugin_name, child)
+                            found = True
+                    else:
+                        plugin_name = child.name
+                        plugin_item = QTreeWidgetItem(["", plugin_name, ""])
+                        source_item.addChild(plugin_item)
+                        self._add_uninstall_button(plugin_item, plugin_name, child)
+                        found = True
 
             if not found:
                 empty_item = QTreeWidgetItem([i18n.t("status_empty"), ""])
@@ -383,12 +448,12 @@ class PluginPanel(QWidget):
         self.status_label.setText(i18n.t("status_ready"))
         self._update_recommended_controls_state()
 
-    def _add_uninstall_button(self, item: QTreeWidgetItem, plugin_path: Path):
+    def _add_uninstall_button(self, item: QTreeWidgetItem, plugin_name: str, plugin_path: Path):
         button = QPushButton(i18n.t("btn_uninstall"))
-        button.clicked.connect(lambda checked=False, p=plugin_path: self.uninstall_plugin(p))
+        button.clicked.connect(lambda checked=False, n=plugin_name, p=plugin_path: self.uninstall_plugin(n, p))
         self.plugin_tree.setItemWidget(item, 2, button)
 
-    def uninstall_plugin(self, plugin_path: Path):
+    def uninstall_plugin(self, plugin_name: str, plugin_path: Path):
         if self.uninstall_worker:
             QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_plugin_uninstall_busy"))
             return
@@ -404,17 +469,40 @@ class PluginPanel(QWidget):
         reply = QMessageBox.warning(
             self,
             i18n.t("title_confirm"),
-            i18n.t("msg_confirm_uninstall", name=plugin_path.name),
+            i18n.t("msg_confirm_uninstall", name=plugin_name),
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
 
-        plugin_name = plugin_path.name
+        instance_name = self.instance_selector.currentData()
+        if not instance_name:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_select_instance_required"))
+            return
+
+        try:
+            openclaw_home = self._detect_openclaw_home()
+        except Exception as e:
+            QMessageBox.critical(self, i18n.t("title_error"), str(e))
+            return
+
+        if ProcessManager.get_status(instance_name) == "Running":
+            QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("msg_plugin_install_requires_stopped_instance"),
+            )
+            return
+
         self.status_label.setText(i18n.t("msg_plugin_uninstalling", name=plugin_name))
         self._set_uninstalling_state(True)
 
-        worker = PluginUninstallWorker(plugin_path)
+        worker = PluginUninstallWorker(
+            openclaw_home=openclaw_home,
+            instance_name=instance_name,
+            plugin_name=plugin_name,
+            plugin_path=plugin_path,
+        )
         worker.finished.connect(self.on_uninstall_finished)
         worker.error.connect(self.on_uninstall_error)
         worker.start()
