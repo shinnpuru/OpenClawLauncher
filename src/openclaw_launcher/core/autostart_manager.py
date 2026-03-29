@@ -72,6 +72,8 @@ class AutoStartManager:
             ["launchctl", "bootout", f"gui/{os.getuid()}", str(plist_path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
         )
 
@@ -81,6 +83,8 @@ class AutoStartManager:
             ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist_path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
         )
         if result.returncode != 0:
