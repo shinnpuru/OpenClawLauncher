@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from openclaw_launcher.ui.main_window import MainWindow
 from openclaw_launcher.ui.theme_manager import theme_manager
+from openclaw_launcher.core.config import Config
 
 
 def _resolve_logo_path() -> str | None:
@@ -49,7 +50,10 @@ def main():
         icon = QIcon(logo_path)
         if not icon.isNull():
             window.setWindowIcon(icon)
-    window.show()
+    if Config.get_setting("start_minimized", False):
+        window.showMinimized()
+    else:
+        window.show()
     
     sys.exit(app.exec())
 

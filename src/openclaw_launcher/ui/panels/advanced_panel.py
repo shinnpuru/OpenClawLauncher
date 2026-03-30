@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QPushButton, QCheckBox, QGroupBox, QScrollArea, QMessageBox
+    QPushButton, QCheckBox, QGroupBox, QScrollArea, QMessageBox, QComboBox
 )
 from ...core.config import Config
 from ...core.autostart_manager import AutoStartManager
@@ -78,6 +78,25 @@ class AdvancedPanel(QWidget):
         self.layout_general.addWidget(self.chk_auto_start)
         self.layout_general.addWidget(self.lbl_auto_start_desc)
         self.layout_general.addWidget(self.lbl_auto_start_status)
+        self.layout_general.addSpacing(10)
+
+        # Startup Behavior
+        self.lbl_startup_behavior = QLabel()
+        self.chk_start_minimized = QCheckBox()
+        self.chk_launch_sample_on_startup = QCheckBox()
+        self.cmb_startup_sample = QComboBox()
+        self.lbl_startup_behavior_desc = QLabel()
+        self.lbl_startup_behavior_desc.setStyleSheet("color: gray; font-size: 11px;")
+        self.lbl_startup_behavior_desc.setWordWrap(True)
+
+        startup_row = QHBoxLayout()
+        startup_row.addWidget(self.chk_launch_sample_on_startup)
+        startup_row.addWidget(self.cmb_startup_sample)
+
+        self.layout_general.addWidget(self.lbl_startup_behavior)
+        self.layout_general.addWidget(self.chk_start_minimized)
+        self.layout_general.addLayout(startup_row)
+        self.layout_general.addWidget(self.lbl_startup_behavior_desc)
         self.layout_general.addSpacing(10)
 
         self.layout.addWidget(self.grp_general)
@@ -179,6 +198,9 @@ class AdvancedPanel(QWidget):
         self.chk_check_updates.stateChanged.connect(lambda: self.save_general("check_updates", self.chk_check_updates.isChecked()))
         self.chk_windows_patch.stateChanged.connect(lambda: self.save_general("windows_a2ui_patch", self.chk_windows_patch.isChecked()))
         self.chk_auto_start.stateChanged.connect(self.on_auto_start_changed)
+        self.chk_start_minimized.stateChanged.connect(lambda: self.save_general("start_minimized", self.chk_start_minimized.isChecked()))
+        self.chk_launch_sample_on_startup.stateChanged.connect(self.on_launch_sample_on_startup_changed)
+        self.cmb_startup_sample.currentIndexChanged.connect(self.on_startup_sample_changed)
 
         # Connect Troubleshoot Actions
         self.btn_clear_dependencies.clicked.connect(self.execute_clear_dependencies)
@@ -192,6 +214,7 @@ class AdvancedPanel(QWidget):
         self.chk_minimize_tray.setChecked(Config.get_setting("minimize_to_tray", False))
         self.chk_check_updates.setChecked(Config.get_setting("check_updates", True))
         self.chk_windows_patch.setChecked(Config.get_setting("windows_a2ui_patch", True))
+        self.chk_start_minimized.setChecked(Config.get_setting("start_minimized", False))
         auto_start_checked = Config.get_setting("auto_start", False)
         if AutoStartManager.is_supported():
             try:
@@ -202,7 +225,66 @@ class AdvancedPanel(QWidget):
         self.chk_auto_start.blockSignals(True)
         self.chk_auto_start.setChecked(auto_start_checked)
         self.chk_auto_start.blockSignals(False)
+
+        startup_sample_name = str(Config.get_setting("startup_sample_instance", "openclaw") or "").strip()
+        self._reload_startup_sample_options(selected_name=startup_sample_name)
+
+        launch_sample_checked = Config.get_setting("launch_sample_on_startup", False)
+        self.chk_launch_sample_on_startup.blockSignals(True)
+        self.chk_launch_sample_on_startup.setChecked(bool(launch_sample_checked))
+        self.chk_launch_sample_on_startup.blockSignals(False)
+        self._update_startup_sample_controls_state()
+
         self.refresh_auto_start_status()
+
+    def _reload_startup_sample_options(self, selected_name: str | None = None):
+        names = []
+        if Config.INSTANCES_DIR.exists():
+            names = [
+                item.name
+                for item in sorted(Config.INSTANCES_DIR.iterdir(), key=lambda p: p.name.lower())
+                if item.is_dir()
+            ]
+
+        self.cmb_startup_sample.blockSignals(True)
+        self.cmb_startup_sample.clear()
+        if names:
+            for name in names:
+                self.cmb_startup_sample.addItem(name, name)
+        else:
+            self.cmb_startup_sample.addItem(i18n.t("opt_no_samples"), "")
+
+        effective_selected = (selected_name or "").strip()
+        if not effective_selected:
+            effective_selected = str(Config.get_setting("startup_sample_instance", "openclaw") or "").strip()
+
+        idx = self.cmb_startup_sample.findData(effective_selected)
+        if idx >= 0:
+            self.cmb_startup_sample.setCurrentIndex(idx)
+        elif names:
+            self.cmb_startup_sample.setCurrentIndex(0)
+            Config.set_setting("startup_sample_instance", self.cmb_startup_sample.currentData())
+        else:
+            Config.set_setting("startup_sample_instance", "")
+        self.cmb_startup_sample.blockSignals(False)
+
+    def _update_startup_sample_controls_state(self):
+        has_samples = bool(self.cmb_startup_sample.count() and self.cmb_startup_sample.currentData())
+        self.cmb_startup_sample.setEnabled(self.chk_launch_sample_on_startup.isChecked() and has_samples)
+
+    def on_launch_sample_on_startup_changed(self):
+        enabled = self.chk_launch_sample_on_startup.isChecked()
+        self.save_general("launch_sample_on_startup", enabled)
+        self._update_startup_sample_controls_state()
+
+    def on_startup_sample_changed(self):
+        sample_name = self.cmb_startup_sample.currentData() or ""
+        self.save_general("startup_sample_instance", sample_name)
+
+    def refresh_startup_samples(self):
+        selected_name = str(Config.get_setting("startup_sample_instance", "openclaw") or "").strip()
+        self._reload_startup_sample_options(selected_name=selected_name)
+        self._update_startup_sample_controls_state()
 
     def update_ui_texts(self):
         # General
@@ -223,6 +305,15 @@ class AdvancedPanel(QWidget):
         self.chk_auto_start.setText(i18n.t("opt_enabled"))
         self.lbl_auto_start_desc.setText(i18n.t("desc_auto_start"))
         self.refresh_auto_start_status()
+
+        self.lbl_startup_behavior.setText(i18n.t("lbl_startup_behavior"))
+        self.chk_start_minimized.setText(i18n.t("opt_start_minimized"))
+        self.chk_launch_sample_on_startup.setText(i18n.t("opt_launch_sample_on_startup"))
+        self.lbl_startup_behavior_desc.setText(i18n.t("desc_startup_behavior"))
+
+        startup_sample_name = str(Config.get_setting("startup_sample_instance", "openclaw") or "").strip()
+        self._reload_startup_sample_options(selected_name=startup_sample_name)
+        self._update_startup_sample_controls_state()
 
         # Sources
         self.grp_sources.setTitle(i18n.t("grp_sources"))
@@ -316,13 +407,10 @@ class AdvancedPanel(QWidget):
             return
 
         try:
-            if Config.INSTANCES_DIR.exists():
-                for instance_dir in Config.INSTANCES_DIR.iterdir():
-                    if not instance_dir.is_dir():
-                        continue
-                    for dep_dir in (instance_dir / "node_modules", instance_dir / ".venv"):
-                        if dep_dir.exists():
-                            self._remove_dir_with_retries(dep_dir)
+            runtime_dir = Config.BASE_DIR / "runtime"
+            if runtime_dir.exists():
+                self._remove_dir_with_retries(runtime_dir)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
             QMessageBox.information(self, i18n.t("title_success"), i18n.t("msg_clear_dependencies_success"))
         except Exception as e:
             QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_operation_failed", error=str(e)))

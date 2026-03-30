@@ -195,6 +195,7 @@ class MainWindow(QMainWindow):
         # Set initial panel
         self.switch_to_panel("onboard")
         QTimer.singleShot(0, self._check_openclaw_updates_on_startup)
+        QTimer.singleShot(300, self._launch_sample_on_startup)
 
     def _setup_sidebar_sections(self):
         """Setup sidebar sections based on i18n"""
@@ -239,6 +240,39 @@ class MainWindow(QMainWindow):
         if panel_name in self.panel_map:
             self.stacked_widget.setCurrentWidget(self.panel_map[panel_name])
             self.sidebar.select_panel(panel_name)
+            if panel_name == "advanced":
+                refresh_startup_samples = getattr(self.advanced_panel, "refresh_startup_samples", None)
+                if callable(refresh_startup_samples):
+                    refresh_startup_samples()
+
+    def _launch_sample_on_startup(self):
+        if not Config.get_setting("launch_sample_on_startup", False):
+            return
+
+        sample_name = str(Config.get_setting("startup_sample_instance", "openclaw") or "").strip()
+        if not sample_name:
+            QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("msg_startup_sample_launch_failed", name="(empty)", error=i18n.t("msg_instance_not_found")),
+            )
+            return
+
+        try:
+            if ProcessManager.get_status(sample_name) == "Running":
+                return
+
+            instance_path = Config.get_instance_path(sample_name)
+            if not instance_path.exists() or not instance_path.is_dir():
+                raise FileNotFoundError(i18n.t("msg_instance_not_found"))
+
+            ProcessManager.start_instance(sample_name, instance_path)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("msg_startup_sample_launch_failed", name=sample_name, error=str(e)),
+            )
 
     def _check_openclaw_updates_on_startup(self):
         if not Config.get_setting("check_updates", True):
