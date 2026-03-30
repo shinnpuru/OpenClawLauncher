@@ -111,7 +111,7 @@ class PluginInstallWorker(QThread):
 
 
 class PluginUninstallWorker(QThread):
-    finished = Signal(str, bool, str)
+    completed = Signal(str, bool, str)
     error = Signal(str, str, str)
 
     def __init__(
@@ -191,7 +191,7 @@ class PluginUninstallWorker(QThread):
 
                 log_file.write("===== Plugin uninstall completed =====\n")
 
-            self.finished.emit(self.plugin_name, self.plugin_path.exists(), str(self.plugin_path))
+            self.completed.emit(self.plugin_name, self.plugin_path.exists(), str(self.plugin_path))
         except Exception as e:
             try:
                 with open(log_file_path, "a", encoding="utf-8", buffering=1) as log_file:
@@ -507,14 +507,14 @@ class PluginPanel(QWidget):
             plugin_name=plugin_name,
             plugin_path=plugin_path,
         )
-        worker.finished.connect(self.on_uninstall_finished)
+        worker.completed.connect(self.on_uninstall_finished)
         worker.error.connect(self.on_uninstall_error)
+        worker.finished.connect(self._cleanup_uninstall_worker)
         worker.start()
         self.uninstall_worker = worker
 
     def on_uninstall_finished(self, plugin_name: str, residual_exists: bool, plugin_path_str: str):
         self._set_uninstalling_state(False)
-        self.uninstall_worker = None
 
         plugin_path = Path(plugin_path_str)
         if residual_exists:
@@ -530,7 +530,6 @@ class PluginPanel(QWidget):
 
     def on_uninstall_error(self, plugin_name: str, error_msg: str, plugin_path_str: str):
         self._set_uninstalling_state(False)
-        self.uninstall_worker = None
 
         plugin_path = Path(plugin_path_str)
         if plugin_path.exists():
@@ -608,12 +607,12 @@ class PluginPanel(QWidget):
         )
         worker.completed.connect(lambda output, name=plugin_name: self.on_install_success(name, output))
         worker.error.connect(lambda error, name=plugin_name: self.on_install_error(name, error))
+        worker.finished.connect(self._cleanup_install_worker)
         worker.start()
         self.install_worker = worker
 
     def on_install_success(self, plugin_name: str, output: str):
         self._set_installing_state(False)
-        self.install_worker = None
 
         config_apply_error = None
         try:
@@ -648,13 +647,26 @@ class PluginPanel(QWidget):
 
     def on_install_error(self, plugin_name: str, error: str):
         self._set_installing_state(False)
-        self.install_worker = None
         self.status_label.setText(i18n.t("msg_plugin_install_failed_short", name=plugin_name))
         QMessageBox.critical(
             self,
             i18n.t("title_error"),
             i18n.t("msg_plugin_install_failed", name=plugin_name, error=error),
         )
+
+    def _cleanup_install_worker(self):
+        worker = self.install_worker
+        if worker is None:
+            return
+        self.install_worker = None
+        worker.deleteLater()
+
+    def _cleanup_uninstall_worker(self):
+        worker = self.uninstall_worker
+        if worker is None:
+            return
+        self.uninstall_worker = None
+        worker.deleteLater()
 
     def _apply_plugin_default_channel_config(self, plugin_name: str):
         normalized = plugin_name.strip().lower()
