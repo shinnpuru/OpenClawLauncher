@@ -751,6 +751,10 @@ store-dir=../../.pnpm-store
             "defaultProfile": "openclaw"
         }
 
+        config_data["commands"] = {
+            "useAccessGroups": False
+        }
+
         config_data["channels"] = {
             "feishu": {
                 "appId": "__OPENCLAW_REDACTED__",
