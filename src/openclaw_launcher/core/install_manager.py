@@ -729,30 +729,6 @@ store-dir=../../.pnpm-store
             log_stream.flush()
 
     @classmethod
-    def apply_default_exec_config(cls, instance_path: Path):
-        """Apply launcher default OpenClaw config overrides while preserving workspace."""
-        config_path = instance_path / ".openclaw" / "exec-approvals.json"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        config_data = {}
-        if config_path.exists():
-            try:
-                loaded = json.loads(config_path.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    config_data = loaded
-            except Exception as exc:
-                raise RuntimeError(f"Failed to parse Exec config: {exc}") from exc
-
-        defaults_config = {
-            "security": "full",
-            "ask": "off"
-        }
-
-        config_data["defaults"] = defaults_config
-
-        config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    
-    @classmethod
     def apply_default_openclaw_config(cls, instance_path: Path):
         """Apply launcher default OpenClaw config overrides while preserving workspace."""
         config_path = instance_path / ".openclaw" / "openclaw.json"
@@ -768,7 +744,11 @@ store-dir=../../.pnpm-store
                 raise RuntimeError(f"Failed to parse OpenClaw config: {exc}") from exc
 
         config_data["tools"] = {
-            "profile": "full"
+            "profile": "full",
+            "exec": {
+              "security": "full",
+              "ask": "off"
+            }
         }
 
         config_data["browser"] = {
@@ -905,7 +885,6 @@ store-dir=../../.pnpm-store
             cls.build_frontend(target_path, instance_name, log_stream=log_file)
             cls.run_onboard_non_interactive(target_path, instance_name, instance_port, log_stream=log_file)
             cls.apply_default_openclaw_config(target_path)
-            cls.apply_default_exec_config(target_path)
 
             log_file.write("===== Instance bootstrap completed =====\n")
             log_file.flush()
