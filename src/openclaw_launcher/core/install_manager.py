@@ -769,7 +769,8 @@ store-dir=../../.pnpm-store
                 "groupPolicy": "open",
                 "chunkMode": "length",
                 "connectionMode": "websocket",
-                "dmPolicy": "open"
+                "dmPolicy": "open",
+                "allowFrom": ["*"]
             }
         }
 
