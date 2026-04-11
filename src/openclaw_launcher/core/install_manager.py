@@ -861,7 +861,7 @@ store-dir=../../.pnpm-store
 
         logger.info(f"Creating instance {instance_name} from {source_path}")
         
-        shutil.copytree(source_path, target_path, ignore=shutil.ignore_patterns('node_modules', '.env'), symlinks=True)
+        shutil.copytree(source_path, target_path, symlinks=True)
         
         log_file_path = Config.get_log_file(instance_name)
         log_file = open(log_file_path, "a", encoding="utf-8")
