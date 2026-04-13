@@ -12,16 +12,6 @@
 
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
-## Purpose
-
-`OpenClaw Launcher` is a PySide6-based desktop launcher that provides a GUI workflow for installing and running [OpenClaw](https://github.com/openclaw/openclaw).
-
-Its primary goals are:
-
-- Replace command-heavy setup/start operations with a visual workflow.
-- Simplify multi-instance management, dependency checks, and troubleshooting.
-- Offer clear access to runtime status, logs, and backups.
-
 ## Key Features
 
 - **Guided Onboarding**: The Onboard panel now covers a 6-step flow (install dependencies, create instance, configure LlamaCPP/model, configure channels, start instance, open WebUI).
@@ -34,24 +24,6 @@ Its primary goals are:
 - **Backup & Restore**: Create zip backups and restore instances; dependency reinstall is attempted after restore.
 - **Log Viewer**: Follow instance logs in-app, clear logs, or open log files with the system default app.
 - **Advanced Settings**: Configure tray behavior, auto-start, update checks, source mirrors, and troubleshooting cleanup actions.
-
-## Footprint Advantage (Important)
-
-- **Small launcher package footprint**: keeps the app lightweight while managing runtimes and instances on demand.
-- **Compact per-instance size**: under common setup, **each instance is about 1GB**, making multi-instance usage practical.
-
-## Panel Overview
-
-- **Onboard**: 6-step guided flow (install dependencies -> create instance -> configure LlamaCPP/model -> configure channels -> start instance -> open WebUI).
-- **Channels**: Per-instance channel credential/config editor with plugin dependency checks and stop-before-save confirmation.
-- **LlamaCPP**: Local GGUF model service control (model file, port, GPU layers, start/stop, API test, logs).
-- **Model Switch**: Per-instance model provider switching for both online APIs and local model services.
-- **Instances**: Lifecycle operations, version update, and shortcuts for folder/CLI.
-- **Dependencies**: Runtime version list, download progress, and default-version switching.
-- **Backups**: Backup creation, backup list, restore flow, and overwrite confirmation.
-- **Logs**: Per-instance log tailing with open/clear operations.
-- **Plugins**: Extension directory inspection plus plugin install/uninstall.
-- **Advanced**: App behavior settings, mirrors/sources, and troubleshooting cleanup utilities.
 
 ## Quick Start
 
