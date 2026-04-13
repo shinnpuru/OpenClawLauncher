@@ -759,21 +759,6 @@ store-dir=../../.pnpm-store
             "useAccessGroups": False
         }
 
-        config_data["channels"] = {
-            "feishu": {
-                "appId": "__OPENCLAW_REDACTED__",
-                "appSecret": "__OPENCLAW_REDACTED__",
-                "enabled": True,
-                "renderMode": "card",
-                "topicSessionMode": "disabled",
-                "groupPolicy": "open",
-                "chunkMode": "length",
-                "connectionMode": "websocket",
-                "dmPolicy": "open",
-                "allowFrom": ["*"]
-            }
-        }
-
         config_data["models"] = {
             "providers": {
                 "llamacpp": {
