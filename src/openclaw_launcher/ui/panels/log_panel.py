@@ -1,12 +1,10 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QListWidget, QTextEdit, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit,
                                QPushButton, QHBoxLayout, QComboBox)
 from PySide6.QtCore import QTimer, QFileSystemWatcher
 from ...core.config import Config
-from ...core.process_manager import ProcessManager
 from ..i18n import i18n
 import subprocess
 import os
-from pathlib import Path
 
 class LogPanel(QWidget):
     def __init__(self):
@@ -16,9 +14,9 @@ class LogPanel(QWidget):
         self.log_watcher.fileChanged.connect(self.on_log_file_changed)
         self.watched_log_file = None
         
-        self.instance_combo = QComboBox()
-        self.instance_combo.currentIndexChanged.connect(self.on_instance_changed)
-        self.layout.addWidget(self.instance_combo)
+        self.log_combo = QComboBox()
+        self.log_combo.currentIndexChanged.connect(self.on_log_changed)
+        self.layout.addWidget(self.log_combo)
         
         self.log_display = QTextEdit()
         self.log_display.setReadOnly(True)
@@ -36,25 +34,37 @@ class LogPanel(QWidget):
         self.layout.addLayout(btn_layout)
         
         self.refresh_timer = QTimer()
-        self.refresh_timer.timeout.connect(self.refresh_instances)
+        self.refresh_timer.timeout.connect(self.refresh_logs)
         self.refresh_timer.start(5000)
         
-        self.refresh_instances()
+        self.refresh_logs()
 
-    def on_instance_changed(self, *_):
+    def on_log_changed(self, *_):
         self._update_log_watch_target()
         self.load_log()
+
+    def _selected_log_path(self):
+        data = self.log_combo.currentData()
+        if not data:
+            return None
+        return Config.LOGS_DIR / data
+
+    def _scan_log_files(self):
+        if not Config.LOGS_DIR.exists():
+            return []
+        files = [p for p in Config.LOGS_DIR.rglob("*.log") if p.is_file()]
+        files.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+        return files
 
     def _update_log_watch_target(self):
         if self.watched_log_file and self.watched_log_file in self.log_watcher.files():
             self.log_watcher.removePath(self.watched_log_file)
 
         self.watched_log_file = None
-        instance_name = self.instance_combo.currentText()
-        if not instance_name:
+        log_path = self._selected_log_path()
+        if not log_path:
             return
 
-        log_path = Config.get_log_file(instance_name)
         if log_path.exists():
             self.watched_log_file = str(log_path)
             self.log_watcher.addPath(self.watched_log_file)
@@ -67,27 +77,27 @@ class LogPanel(QWidget):
         self.btn_open.setText(i18n.t("btn_open_logs"))
         self.btn_clear.setText(i18n.t("btn_clear_logs"))
 
-    def refresh_instances(self):
-        current = self.instance_combo.currentText()
-        self.instance_combo.clear()
-        if Config.INSTANCES_DIR.exists():
-            for d in Config.INSTANCES_DIR.iterdir():
-                if d.is_dir():
-                    self.instance_combo.addItem(d.name)
-        
-        idx = self.instance_combo.findText(current)
+    def refresh_logs(self):
+        current = self.log_combo.currentData()
+        self.log_combo.clear()
+
+        for path in self._scan_log_files():
+            relative = str(path.relative_to(Config.LOGS_DIR)).replace("\\", "/")
+            self.log_combo.addItem(relative, relative)
+
+        idx = self.log_combo.findData(current)
         if idx >= 0:
-            self.instance_combo.setCurrentIndex(idx)
+            self.log_combo.setCurrentIndex(idx)
         else:
             self._update_log_watch_target()
+            self.load_log()
 
     def load_log(self):
-        instance_name = self.instance_combo.currentText()
-        if not instance_name:
+        log_path = self._selected_log_path()
+        if not log_path:
             self.log_display.clear()
             return
-            
-        log_path = Config.get_log_file(instance_name)
+
         if log_path.exists():
             try:
                 with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
@@ -106,9 +116,9 @@ class LogPanel(QWidget):
             self._update_log_watch_target()
 
     def clear_logs(self):
-        instance_name = self.instance_combo.currentText()
-        if not instance_name: return
-        log_path = Config.get_log_file(instance_name)
+        log_path = self._selected_log_path()
+        if not log_path:
+            return
         if log_path.exists():
             with open(log_path, 'w') as f:
                 f.write("")
@@ -116,11 +126,10 @@ class LogPanel(QWidget):
 
     def open_log_file(self):
         """Open the log file with the system's default application"""
-        instance_name = self.instance_combo.currentText()
-        if not instance_name:
+        log_path = self._selected_log_path()
+        if not log_path:
             return
-        
-        log_path = Config.get_log_file(instance_name)
+
         if log_path.exists():
             if os.name == 'nt':  # Windows
                 os.startfile(str(log_path))
