@@ -603,7 +603,7 @@ store-dir=../../.pnpm-store
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
 
         logger.info(f"Installing dependencies in {instance_path}")
-        cls._run_pnpm(instance_path, ["install"], env, log_stream=log_stream)
+        cls._run_pnpm(instance_path, ["install", "--ignore-scripts"], env, log_stream=log_stream)
 
     @classmethod
     def apply_windows_a2ui_patch(cls, instance_path: Path, log_stream: Optional[TextIO] = None):
