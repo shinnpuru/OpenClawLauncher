@@ -600,10 +600,24 @@ store-dir=../../.pnpm-store
 """.strip() + "\n"
         npmrc_path.write_text(npmrc_content, encoding="utf-8")
 
+        # Remove patchedDependencies from package.json since patches/ dir is not included in npm pack
+        package_json = instance_path / "package.json"
+        if package_json.exists():
+            try:
+                pkg_data = json.loads(package_json.read_text(encoding="utf-8"))
+                if "pnpm" in pkg_data and isinstance(pkg_data["pnpm"], dict):
+                    if "patchedDependencies" in pkg_data["pnpm"]:
+                        del pkg_data["pnpm"]["patchedDependencies"]
+                        if not pkg_data["pnpm"]:
+                            del pkg_data["pnpm"]
+                    package_json.write_text(json.dumps(pkg_data, indent=2) + "\n", encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"Failed to remove patchedDependencies from package.json: {e}")
+
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
 
         logger.info(f"Installing dependencies in {instance_path}")
-        cls._run_pnpm(instance_path, ["install", "--ignore-scripts"], env, log_stream=log_stream)
+        cls._run_pnpm(instance_path, ["install", "--prod"], env, log_stream=log_stream)
 
     @classmethod
     def apply_windows_a2ui_patch(cls, instance_path: Path, log_stream: Optional[TextIO] = None):
@@ -688,20 +702,6 @@ store-dir=../../.pnpm-store
         if log_stream is not None:
             log_stream.write("Applied Windows A2UI placeholder patch.\n")
             log_stream.flush()
-
-    @classmethod
-    def build_frontend(cls, instance_path: Path, instance_name: str, log_stream: Optional[TextIO] = None):
-        """Build the UI components."""
-        logger.info(f"Building UI in {instance_path}")
-        env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
-        cls._run_pnpm(instance_path, ["ui:build"], env, log_stream=log_stream)
-
-    @classmethod
-    def build_backend(cls, instance_path: Path, instance_name: str, log_stream: Optional[TextIO] = None):
-        """Build the backend/application."""
-        logger.info(f"Building OpenClaw in {instance_path}")
-        env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
-        cls._run_pnpm(instance_path, ["build"], env, log_stream=log_stream)
 
     @classmethod
     def run_onboard_non_interactive(cls, instance_path: Path, instance_name: str, instance_port: int, log_stream: Optional[TextIO] = None):
@@ -867,8 +867,6 @@ store-dir=../../.pnpm-store
                 cls.apply_windows_a2ui_patch(target_path, log_stream=log_file)
 
             cls.install_dependencies(target_path, instance_name, log_stream=log_file)
-            cls.build_backend(target_path, instance_name, log_stream=log_file)
-            cls.build_frontend(target_path, instance_name, log_stream=log_file)
             cls.run_onboard_non_interactive(target_path, instance_name, instance_port, log_stream=log_file)
             cls.apply_default_openclaw_config(target_path)
 
@@ -988,8 +986,6 @@ store-dir=../../.pnpm-store
             
             # Reinstall dependencies
             cls.install_dependencies(current_path, instance_name, log_stream=log_file)
-            cls.build_backend(current_path, instance_name, log_stream=log_file)
-            cls.build_frontend(current_path, instance_name, log_stream=log_file)
 
             log_file.write("===== Instance update completed =====\n")
             log_file.flush()

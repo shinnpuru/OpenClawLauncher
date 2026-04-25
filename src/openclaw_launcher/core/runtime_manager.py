@@ -10,6 +10,7 @@ import urllib.parse
 import ssl
 import sys
 import re
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -287,45 +288,79 @@ class RuntimeManager:
 
         Config.set_setting(self._runtime_default_key(software), normalized)
 
+    def _find_runtime_npm(self) -> str:
+        """Find npm executable from installed Node runtime."""
+        node_ver = self.get_default_version(self.SOFTWARE_NODE)
+        if not node_ver:
+            raise FileNotFoundError("No Node runtime installed")
+
+        exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
+        node_bin_dir = exe_path.parent
+        runtime_root = node_bin_dir.parent
+
+        # Look for npm in runtime
+        candidates = []
+        if platform.system() == "Windows":
+            candidates = [
+                node_bin_dir / "npm.cmd",
+                node_bin_dir / "npm.exe",
+                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+            ]
+        else:
+            candidates = [
+                node_bin_dir / "npm",
+                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+            ]
+
+        for candidate in candidates:
+            if candidate.exists() and candidate.is_file():
+                return str(candidate)
+
+        raise FileNotFoundError("npm not found in Node runtime")
+
     def _fetch_openclaw_versions(self) -> List[Dict]:
         versions = []
 
-        def _github_json_get(url: str):
-            context = ssl._create_unverified_context()
-            req = urllib.request.Request(
-                url,
-                headers={"Accept": "application/vnd.github+json", "User-Agent": "openclaw-launcher"},
-            )
-            with urllib.request.urlopen(req, context=context, timeout=20) as response:
-                return json.loads(response.read().decode("utf-8"))
-
-        api_url = "https://api.github.com/repos/openclaw/openclaw/tags?per_page=20"
         try:
-            logger.info(f"Fetching OpenClaw tags from: {api_url}")
-            payload = _github_json_get(api_url)
+            logger.info("Fetching OpenClaw versions from npm registry")
+            npm_cmd = self._find_runtime_npm()
+            # If it's a .js file, we need to run it with node
+            if npm_cmd.endswith(".js"):
+                node_ver = self.get_default_version(self.SOFTWARE_NODE)
+                exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
+                cmd = [str(exe_path), npm_cmd, "view", "openclaw", "versions", "--json"]
+            else:
+                cmd = [npm_cmd, "view", "openclaw", "versions", "--json"]
 
-            candidates = []
-            for item in payload:
-                tag = str(item.get("name", "")).strip()
-                if tag.startswith("v"):
-                    candidates.append({
-                        "version": tag,
-                        "url": f"https://github.com/openclaw/openclaw/archive/refs/tags/{tag}.zip"
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            version_list = json.loads(result.stdout)
+            if isinstance(version_list, list):
+                # Filter versions that look like valid releases (start with digit) and exclude prerelease versions
+                prerelease_keywords = ("beta", "alpha", "rc", "preview", "dev", "canary", "next")
+                valid_versions = [
+                    v for v in version_list
+                    if isinstance(v, str) and v and v[0].isdigit()
+                    and not any(keyword in v.lower() for keyword in prerelease_keywords)
+                ]
+                # Sort and take latest 10
+                valid_versions.sort(key=self._natural_version_key, reverse=True)
+                valid_versions = valid_versions[:10]
+
+                for ver in valid_versions:
+                    versions.append({
+                        "version": ver,
+                        "date": ver,
                     })
 
-            candidates.sort(key=lambda x: self._natural_version_key(x["version"]), reverse=True)
-            candidates = candidates[:10]
-
-            for item in candidates:
-                versions.append({
-                    "version": item["version"],
-                    "date": self._date_from_openclaw_tag(item["version"]),
-                    "url": item["url"],
-                })
-
-            logger.info(f"Fetched {len(versions)} OpenClaw tags")
+            logger.info(f"Fetched {len(versions)} OpenClaw versions from npm")
         except Exception as e:
-            logger.warning(f"Failed to fetch OpenClaw tags: {e}")
+            logger.warning(f"Failed to fetch OpenClaw versions from npm: {e}")
 
         return versions
 
@@ -461,17 +496,39 @@ class RuntimeManager:
             target_dir.mkdir(parents=True, exist_ok=True)
             
             if software == self.SOFTWARE_OPENCLAW:
-                archive_ref = "heads/main" if version == "main" else f"tags/{version}"
-                archive_url = f"https://github.com/openclaw/openclaw/archive/refs/{archive_ref}.zip"
-                archive_url = self._with_github_proxy(archive_url)
-                archive_name = f"openclaw-{version}.zip"
-                dl_path = temp_dir / archive_name
+                # Use npm pack to download the package
+                self._emit_progress(callback, "download", 0, None, f"Downloading openclaw@{version}")
+                try:
+                    npm_cmd = self._find_runtime_npm()
+                    # If it's a .js file, we need to run it with node
+                    if npm_cmd.endswith(".js"):
+                        node_ver = self.get_default_version(self.SOFTWARE_NODE)
+                        exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
+                        cmd = [str(exe_path), npm_cmd, "pack", f"openclaw@{version}"]
+                    else:
+                        cmd = [npm_cmd, "pack", f"openclaw@{version}"]
 
-                self._download_file(archive_url, dl_path, callback=callback)
-                self._emit_progress(callback, "extract", 0, None, f"Extracting {archive_name}")
-                self._extract_archive(dl_path, target_dir)
-                self._emit_progress(callback, "extract", 1, 1, f"Extracted {archive_name}")
-                dl_path.unlink()
+                    pack_result = subprocess.run(
+                        cmd,
+                        cwd=temp_dir,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=120,
+                    )
+                    # npm pack outputs the filename to stdout
+                    tarball_name = pack_result.stdout.strip().splitlines()[-1].strip()
+                    tarball_path = temp_dir / tarball_name
+
+                    if not tarball_path.exists():
+                        raise RuntimeError(f"npm pack did not create expected tarball: {tarball_name}")
+
+                    self._emit_progress(callback, "extract", 0, None, f"Extracting {tarball_name}")
+                    self._extract_archive(tarball_path, target_dir)
+                    self._emit_progress(callback, "extract", 1, 1, f"Extracted {tarball_name}")
+                    tarball_path.unlink()
+                except subprocess.CalledProcessError as e:
+                    raise RuntimeError(f"npm pack failed: {e.stderr}") from e
             else:
                 meta = next((item for item in self._available_versions.get(software, []) if item["version"] == version), {})
                 url = self._get_download_url(software, version, meta)
