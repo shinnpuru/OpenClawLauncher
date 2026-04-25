@@ -65,7 +65,7 @@ class AdvancedPanel(QWidget):
         self.layout_general.addWidget(self.chk_windows_patch)
         self.layout_general.addWidget(self.lbl_windows_patch_desc)
         self.layout_general.addSpacing(10)
-        
+
         # Auto Start
         self.lbl_auto_start = QLabel()
         self.chk_auto_start = QCheckBox()
@@ -73,7 +73,7 @@ class AdvancedPanel(QWidget):
         self.lbl_auto_start_desc.setStyleSheet("color: gray; font-size: 11px;")
         self.lbl_auto_start_status = QLabel()
         self.lbl_auto_start_status.setStyleSheet("color: gray; font-size: 11px;")
-        
+
         self.layout_general.addWidget(self.lbl_auto_start)
         self.layout_general.addWidget(self.chk_auto_start)
         self.layout_general.addWidget(self.lbl_auto_start_desc)
@@ -83,19 +83,21 @@ class AdvancedPanel(QWidget):
         # Startup Behavior
         self.lbl_startup_behavior = QLabel()
         self.chk_start_minimized = QCheckBox()
+        self.chk_auto_start_llamacpp = QCheckBox()
         self.chk_launch_sample_on_startup = QCheckBox()
         self.cmb_startup_sample = QComboBox()
         self.lbl_startup_behavior_desc = QLabel()
         self.lbl_startup_behavior_desc.setStyleSheet("color: gray; font-size: 11px;")
         self.lbl_startup_behavior_desc.setWordWrap(True)
 
-        startup_row = QHBoxLayout()
-        startup_row.addWidget(self.chk_launch_sample_on_startup)
-        startup_row.addWidget(self.cmb_startup_sample)
+        startup_sample_row = QHBoxLayout()
+        startup_sample_row.addWidget(self.chk_launch_sample_on_startup)
+        startup_sample_row.addWidget(self.cmb_startup_sample)
 
         self.layout_general.addWidget(self.lbl_startup_behavior)
         self.layout_general.addWidget(self.chk_start_minimized)
-        self.layout_general.addLayout(startup_row)
+        self.layout_general.addWidget(self.chk_auto_start_llamacpp)
+        self.layout_general.addLayout(startup_sample_row)
         self.layout_general.addWidget(self.lbl_startup_behavior_desc)
         self.layout_general.addSpacing(10)
 
@@ -197,6 +199,7 @@ class AdvancedPanel(QWidget):
         self.chk_minimize_tray.stateChanged.connect(lambda: self.save_general("minimize_to_tray", self.chk_minimize_tray.isChecked()))
         self.chk_check_updates.stateChanged.connect(lambda: self.save_general("check_updates", self.chk_check_updates.isChecked()))
         self.chk_windows_patch.stateChanged.connect(lambda: self.save_general("windows_a2ui_patch", self.chk_windows_patch.isChecked()))
+        self.chk_auto_start_llamacpp.stateChanged.connect(lambda: self.save_general("auto_start_llamacpp", self.chk_auto_start_llamacpp.isChecked()))
         self.chk_auto_start.stateChanged.connect(self.on_auto_start_changed)
         self.chk_start_minimized.stateChanged.connect(lambda: self.save_general("start_minimized", self.chk_start_minimized.isChecked()))
         self.chk_launch_sample_on_startup.stateChanged.connect(self.on_launch_sample_on_startup_changed)
@@ -214,6 +217,7 @@ class AdvancedPanel(QWidget):
         self.chk_minimize_tray.setChecked(Config.get_setting("minimize_to_tray", False))
         self.chk_check_updates.setChecked(Config.get_setting("check_updates", True))
         self.chk_windows_patch.setChecked(Config.get_setting("windows_a2ui_patch", True))
+        self.chk_auto_start_llamacpp.setChecked(Config.get_setting("auto_start_llamacpp", False))
         self.chk_start_minimized.setChecked(Config.get_setting("start_minimized", False))
         auto_start_checked = Config.get_setting("auto_start", False)
         if AutoStartManager.is_supported():
@@ -308,6 +312,7 @@ class AdvancedPanel(QWidget):
 
         self.lbl_startup_behavior.setText(i18n.t("lbl_startup_behavior"))
         self.chk_start_minimized.setText(i18n.t("opt_start_minimized"))
+        self.chk_auto_start_llamacpp.setText(i18n.t("opt_auto_start_llamacpp"))
         self.chk_launch_sample_on_startup.setText(i18n.t("opt_launch_sample_on_startup"))
         self.lbl_startup_behavior_desc.setText(i18n.t("desc_startup_behavior"))
 

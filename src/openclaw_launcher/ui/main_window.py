@@ -196,6 +196,7 @@ class MainWindow(QMainWindow):
         self.switch_to_panel("onboard")
         QTimer.singleShot(0, self._check_openclaw_updates_on_startup)
         QTimer.singleShot(300, self._launch_sample_on_startup)
+        QTimer.singleShot(500, self._auto_start_llamacpp_on_startup)
 
     def _setup_sidebar_sections(self):
         """Setup sidebar sections based on i18n"""
@@ -273,6 +274,30 @@ class MainWindow(QMainWindow):
                 i18n.t("title_warning"),
                 i18n.t("msg_startup_sample_launch_failed", name=sample_name, error=str(e)),
             )
+
+    def _auto_start_llamacpp_on_startup(self):
+        """Auto-start llamacpp server on launcher startup if enabled and configured."""
+        if not Config.get_setting("auto_start_llamacpp", False):
+            return
+
+        # Check if llamacpp panel has a model configured
+        llamacpp_config = Config.get_setting("llamacpp_config", {})
+        if not isinstance(llamacpp_config, dict):
+            return
+
+        model = llamacpp_config.get("model", "")
+        if not model or model == i18n.t("llamacpp_no_models_found"):
+            return
+
+        # Check if already running
+        if hasattr(self.llamacpp_panel, '_is_running') and self.llamacpp_panel._is_running:
+            return
+
+        # Start the llamacpp server
+        try:
+            self.llamacpp_panel.start_server()
+        except Exception as e:
+            print(f"Failed to auto-start llamacpp: {e}")
 
     def _check_openclaw_updates_on_startup(self):
         if not Config.get_setting("check_updates", True):
