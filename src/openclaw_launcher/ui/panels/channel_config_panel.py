@@ -21,14 +21,12 @@ from ..i18n import i18n
 
 class ChannelConfigPanel(QWidget):
     DINGTALK_PLUGIN = "@dingtalk-real-ai/dingtalk-connector"
-    QQ_PLUGIN = "@sliverp/qqbot"
     telegram_KEYS = ("telegram", "telegram")
 
     def __init__(self):
         super().__init__()
         self._active_telegram_key = "telegram"
         self._dingtalk_available = False
-        self._qq_available = False
 
         self.layout = QVBoxLayout(self)
 
@@ -77,6 +75,16 @@ class ChannelConfigPanel(QWidget):
         self.channel_form.addRow(self.feishu_app_id_label, self.feishu_app_id)
         self.channel_form.addRow(self.feishu_app_secret_label, self.feishu_app_secret)
 
+        self.qq_app_id = QLineEdit()
+        self.qq_app_secret = QLineEdit()
+        self.qq_app_secret.setEchoMode(QLineEdit.Password)
+        self.qq_app_id.setPlaceholderText(i18n.t("ph_app_id"))
+        self.qq_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
+        self.qq_app_id_label = QLabel()
+        self.qq_app_secret_label = QLabel()
+        self.channel_form.addRow(self.qq_app_id_label, self.qq_app_id)
+        self.channel_form.addRow(self.qq_app_secret_label, self.qq_app_secret)
+
         self.dingtalk_app_id = QLineEdit()
         self.dingtalk_app_secret = QLineEdit()
         self.dingtalk_app_secret.setEchoMode(QLineEdit.Password)
@@ -91,21 +99,6 @@ class ChannelConfigPanel(QWidget):
         self.dingtalk_hint.setStyleSheet("color: orange;")
         self.dingtalk_hint.setWordWrap(True)
         group_layout.addWidget(self.dingtalk_hint)
-
-        self.qq_app_id = QLineEdit()
-        self.qq_app_secret = QLineEdit()
-        self.qq_app_secret.setEchoMode(QLineEdit.Password)
-        self.qq_app_id.setPlaceholderText(i18n.t("ph_app_id"))
-        self.qq_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
-        self.qq_app_id_label = QLabel()
-        self.qq_app_secret_label = QLabel()
-        self.channel_form.addRow(self.qq_app_id_label, self.qq_app_id)
-        self.channel_form.addRow(self.qq_app_secret_label, self.qq_app_secret)
-
-        self.qq_hint = QLabel("")
-        self.qq_hint.setStyleSheet("color: orange;")
-        self.qq_hint.setWordWrap(True)
-        group_layout.addWidget(self.qq_hint)
 
         self.btn_save = QPushButton(i18n.t("btn_save"))
         self.btn_save.clicked.connect(self.save_channel_config)
@@ -197,16 +190,11 @@ class ChannelConfigPanel(QWidget):
 
     def _update_plugin_gate_state(self):
         self._dingtalk_available = self._is_plugin_installed(self.DINGTALK_PLUGIN)
-        self._qq_available = self._is_plugin_installed(self.QQ_PLUGIN)
 
         self._set_field_pair_enabled(self.dingtalk_app_id, self.dingtalk_app_secret, self._dingtalk_available)
-        self._set_field_pair_enabled(self.qq_app_id, self.qq_app_secret, self._qq_available)
 
         self.dingtalk_hint.setText(
             "" if self._dingtalk_available else i18n.t("msg_channel_requires_plugin_dingtalk")
-        )
-        self.qq_hint.setText(
-            "" if self._qq_available else i18n.t("msg_channel_requires_plugin_qq")
         )
 
     def _update_controls_state(self):
@@ -386,6 +374,16 @@ class ChannelConfigPanel(QWidget):
                 },
             )
 
+            self._merge_channel(
+                channels_obj,
+                "qqbot",
+                {
+                    "enabled": True,
+                    "appId": self.qq_app_id.text().strip(),
+                    "clientSecret": self.qq_app_secret.text().strip(),
+                },
+            )
+
             skipped = []
             if self._dingtalk_available:
                 self._merge_channel(
@@ -396,17 +394,6 @@ class ChannelConfigPanel(QWidget):
                         "clientId": self.dingtalk_app_id.text().strip(),
                         "clientSecret": self.dingtalk_app_secret.text().strip(),
                         "gatewayToken": InstallManager.get_instance_gateway_token(instance_path, instance_name),
-                    },
-                )
-
-            if self._qq_available:
-                self._merge_channel(
-                    channels_obj,
-                    "qqbot",
-                    {
-                        "enabled": True,
-                        "appId": self.qq_app_id.text().strip(),
-                        "clientSecret": self.qq_app_secret.text().strip(),
                     },
                 )
 
