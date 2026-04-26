@@ -1,2 +1,5 @@
 src/
 uv.lock
+build/
+dist/
+llama/

@@ -8,29 +8,39 @@
   <link rel="icon" href="./icon.ico" type="image/x-icon" />
   <style>
     :root {
-      color-scheme: light dark;
-      --md-bg: #f7f8fc;
-      --md-surface: #ffffff;
-      --md-surface-2: #eff2ff;
-      --md-text: #1a1c22;
-      --md-muted: #596074;
-      --md-primary: #4758f3;
-      --md-primary-strong: #2f46f0;
-      --md-outline: #d8ddef;
-      --md-shadow: 0 8px 28px rgba(40, 54, 125, 0.12);
-      --md-radius: 20px;
-    }
-
-    :root[data-theme="dark"] {
-      --md-bg: #0f1116;
-      --md-surface: #171a22;
-      --md-surface-2: #1f2430;
-      --md-text: #eceffd;
-      --md-muted: #a5acc4;
-      --md-primary: #95a3ff;
-      --md-primary-strong: #b0b9ff;
-      --md-outline: #2d3445;
-      --md-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+      /* Claude Design System - Warm Palette */
+      --parchment: #f5f4ed;
+      --ivory: #faf9f5;
+      --pure-white: #ffffff;
+      --warm-sand: #e8e6dc;
+      --border-cream: #f0eee6;
+      --border-warm: #e8e6dc;
+      
+      --near-black: #141413;
+      --dark-surface: #30302e;
+      --deep-dark: #141413;
+      
+      --charcoal-warm: #4d4c48;
+      --olive-gray: #5e5d59;
+      --stone-gray: #87867f;
+      --dark-warm: #3d3d3a;
+      --warm-silver: #b0aea5;
+      
+      --terracotta: #c96442;
+      --coral: #d97757;
+      --ring-warm: #d1cfc5;
+      --ring-deep: #c2c0b6;
+      
+      --focus-blue: #3898ec;
+      
+      /* Typography */
+      --font-serif: Georgia, "Times New Roman", serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      
+      /* Shadows */
+      --shadow-ring: 0px 0px 0px 1px var(--ring-warm);
+      --shadow-ring-deep: 0px 0px 0px 1px var(--ring-deep);
+      --shadow-whisper: rgba(0,0,0,0.05) 0px 4px 24px;
     }
 
     * { box-sizing: border-box; }
@@ -38,73 +48,127 @@
     html, body { margin: 0; padding: 0; }
 
     body {
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at 15% -5%, color-mix(in srgb, var(--md-primary) 16%, transparent), transparent 45%), var(--md-bg);
-      color: var(--md-text);
-      line-height: 1.65;
+      font-family: var(--font-sans);
+      background: var(--parchment);
+      color: var(--near-black);
+      line-height: 1.60;
+      font-size: 16px;
+    }
+
+    /* Typography Hierarchy */
+    h1, h2, h3 {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(36px, 4vw, 64px);
+      line-height: 1.10;
+      color: var(--near-black);
+    }
+
+    h2 {
+      font-size: clamp(28px, 3vw, 52px);
+      line-height: 1.20;
+      color: var(--near-black);
+    }
+
+    h3 {
+      font-size: 25px;
+      line-height: 1.20;
+      color: var(--near-black);
     }
 
     .container {
-      width: min(1140px, 92vw);
+      width: min(1200px, 92vw);
       margin: 0 auto;
     }
 
+    /* Navigation */
     .topbar {
       position: sticky;
       top: 0;
       z-index: 20;
+      background: color-mix(in srgb, var(--parchment) 95%, transparent);
       backdrop-filter: blur(10px);
-      border-bottom: 1px solid color-mix(in srgb, var(--md-outline) 70%, transparent);
-      background: color-mix(in srgb, var(--md-bg) 80%, transparent);
+      border-bottom: 1px solid var(--border-cream);
     }
 
     .topbar-inner {
-      min-height: 64px;
+      min-height: 72px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
     }
 
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       text-decoration: none;
-      color: inherit;
-      font-weight: 700;
-      letter-spacing: 0.2px;
+      color: var(--near-black);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 17px;
+      letter-spacing: normal;
     }
 
     .brand img {
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border-radius: 8px;
-      border: 1px solid var(--md-outline);
-      background: var(--md-surface);
-      padding: 2px;
+      border: 1px solid var(--border-cream);
+      background: var(--ivory);
+      padding: 3px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .icon-btn {
-      border: 1px solid var(--md-outline);
-      background: var(--md-surface);
-      color: var(--md-text);
-      border-radius: 999px;
-      padding: 8px 12px;
+      border: 1px solid var(--border-warm);
+      background: var(--warm-sand);
+      color: var(--charcoal-warm);
+      border-radius: 8px;
+      padding: 8px 14px;
       cursor: pointer;
-      font-weight: 600;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 14px;
+      box-shadow: 0px 0px 0px 0px var(--warm-sand), 0px 0px 0px 1px var(--ring-warm);
+      transition: all 0.15s ease;
     }
 
+    .icon-btn:hover {
+      background: var(--border-cream);
+      box-shadow: 0px 0px 0px 1px var(--ring-deep);
+    }
+
+    /* Hero Section */
     .hero {
-      padding: 48px 0 24px;
+      padding: 80px 0 60px;
     }
 
     .hero-card {
-      background: linear-gradient(145deg, color-mix(in srgb, var(--md-surface) 86%, var(--md-primary) 14%), var(--md-surface));
-      border: 1px solid var(--md-outline);
-      border-radius: 28px;
-      box-shadow: var(--md-shadow);
-      padding: 34px;
+      background: var(--ivory);
+      border: 1px solid var(--border-cream);
+      border-radius: 32px;
+      padding: 48px;
+      box-shadow: var(--shadow-whisper);
+    }
+
+    .subtitle {
+      margin: 16px 0 0;
+      font-size: 20px;
+      line-height: 1.60;
+      color: var(--olive-gray);
+      font-family: var(--font-sans);
+      max-width: 760px;
     }
 
     .badge-row,
@@ -115,148 +179,240 @@
       gap: 10px;
     }
 
-    .badge,
+    .chips {
+      margin: 24px 0 28px;
+    }
+
     .chip {
       border-radius: 999px;
-      border: 1px solid var(--md-outline);
-      background: var(--md-surface-2);
-      padding: 6px 12px;
-      font-size: 13px;
-      color: var(--md-muted);
+      border: 1px solid var(--border-warm);
+      background: var(--parchment);
+      padding: 6px 14px;
+      font-size: 14px;
+      color: var(--olive-gray);
+      font-family: var(--font-sans);
     }
 
-    h1 {
-      margin: 12px 0 10px;
-      font-size: clamp(30px, 4.2vw, 50px);
-      line-height: 1.15;
-      letter-spacing: .2px;
-    }
-
-    .subtitle {
-      margin: 0 0 16px;
-      font-size: clamp(16px, 1.95vw, 20px);
-      color: var(--md-muted);
-      max-width: 860px;
-    }
-
+    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       text-decoration: none;
-      border-radius: 14px;
-      border: 1px solid transparent;
-      padding: 11px 16px;
-      font-weight: 700;
-      transition: .2s ease;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 16px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      border: none;
     }
 
-    .btn:hover { transform: translateY(-1px); }
-
     .btn-primary {
-      color: #fff;
-      background: linear-gradient(130deg, var(--md-primary), var(--md-primary-strong));
-      box-shadow: 0 8px 20px color-mix(in srgb, var(--md-primary) 35%, transparent);
+      color: var(--ivory);
+      background: var(--terracotta);
+      padding: 12px 20px;
+      box-shadow: 0px 0px 0px 0px var(--terracotta), 0px 0px 0px 1px var(--terracotta);
+    }
+
+    .btn-primary:hover {
+      background: var(--coral);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      color: var(--charcoal-warm);
+      background: var(--warm-sand);
+      padding: 12px 20px;
+      box-shadow: 0px 0px 0px 0px var(--warm-sand), 0px 0px 0px 1px var(--ring-warm);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-cream);
+      box-shadow: 0px 0px 0px 1px var(--ring-deep);
     }
 
     .btn-outline {
-      color: var(--md-text);
-      border-color: var(--md-outline);
-      background: var(--md-surface);
+      color: var(--near-black);
+      background: var(--pure-white);
+      padding: 12px 20px;
+      border: 1px solid var(--border-cream);
     }
 
+    .btn-outline:hover {
+      background: var(--ivory);
+      box-shadow: 0px 0px 0px 1px var(--ring-warm);
+    }
+
+    /* Sections */
     .section {
-      padding: 20px 0;
+      padding: 60px 0;
     }
 
-    .section h2 {
-      margin: 0 0 8px;
-      font-size: clamp(24px, 3vw, 34px);
+    .section-header {
+      margin-bottom: 32px;
     }
 
     .section .desc {
-      margin: 0 0 18px;
-      color: var(--md-muted);
-      max-width: 860px;
+      margin: 12px 0 0;
+      font-size: 17px;
+      line-height: 1.60;
+      color: var(--olive-gray);
+      font-family: var(--font-sans);
+      max-width: 760px;
     }
 
+    /* Grids */
     .grid-3,
     .grid-2,
     .shot-grid {
       display: grid;
-      gap: 14px;
+      gap: 20px;
     }
 
     .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .shot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+    /* Cards */
     .card {
-      background: var(--md-surface);
-      border: 1px solid var(--md-outline);
-      border-radius: var(--md-radius);
-      padding: 18px;
-      box-shadow: var(--md-shadow);
+      background: var(--ivory);
+      border: 1px solid var(--border-cream);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: var(--shadow-whisper);
+      transition: all 0.15s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-whisper), 0px 0px 0px 1px var(--ring-warm);
     }
 
     .card h3 {
-      margin: 0 0 6px;
-      font-size: 18px;
+      font-size: 20px;
+      margin-bottom: 10px;
     }
 
     .card p {
       margin: 0;
-      color: var(--md-muted);
+      color: var(--olive-gray);
       font-size: 15px;
+      line-height: 1.60;
+      font-family: var(--font-sans);
     }
 
+    /* Ordered Lists */
     .ol {
       margin: 0;
-      padding-left: 20px;
-      color: var(--md-muted);
+      padding-left: 22px;
+      color: var(--olive-gray);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.60;
     }
 
-    .ol li + li { margin-top: 6px; }
+    .ol li { padding-left: 4px; }
+    .ol li + li { margin-top: 10px; }
 
+    /* Screenshots */
     .shot {
       overflow: hidden;
       border-radius: 16px;
-      border: 1px solid var(--md-outline);
-      background: var(--md-surface);
-      box-shadow: var(--md-shadow);
+      border: 1px solid var(--border-cream);
+      background: var(--ivory);
+      box-shadow: var(--shadow-whisper);
+      transition: all 0.15s ease;
+    }
+
+    .shot:hover {
+      box-shadow: var(--shadow-whisper), 0px 0px 0px 1px var(--ring-warm);
     }
 
     .shot img {
       width: 100%;
-      height: 190px;
+      height: 180px;
       object-fit: cover;
       display: block;
-      border-bottom: 1px solid var(--md-outline);
+      border-bottom: 1px solid var(--border-cream);
     }
 
     .shot p {
       margin: 0;
-      padding: 10px 12px;
+      padding: 12px 16px;
       font-size: 14px;
-      color: var(--md-muted);
+      color: var(--olive-gray);
+      font-family: var(--font-sans);
+      background: var(--ivory);
     }
 
+    /* Dark Section */
+    .section-dark {
+      background: var(--deep-dark);
+      margin: 60px 0;
+      padding: 80px 0;
+    }
+
+    .section-dark h2 {
+      color: var(--ivory);
+    }
+
+    .section-dark .desc {
+      color: var(--warm-silver);
+    }
+
+    .section-dark .card {
+      background: var(--dark-surface);
+      border-color: var(--dark-surface);
+    }
+
+    .section-dark .card h3 {
+      color: var(--ivory);
+    }
+
+    .section-dark .card p,
+    .section-dark .ol {
+      color: var(--warm-silver);
+    }
+
+    .section-dark .btn-secondary {
+      background: var(--dark-surface);
+      color: var(--warm-silver);
+      border: 1px solid var(--dark-surface);
+      box-shadow: none;
+    }
+
+    .section-dark .btn-secondary:hover {
+      background: var(--charcoal-warm);
+      color: var(--ivory);
+    }
+
+    /* Footer */
     footer {
-      padding: 26px 0 40px;
+      padding: 40px 0 60px;
       text-align: center;
-      color: var(--md-muted);
-      font-size: 13px;
+      color: var(--stone-gray);
+      font-size: 14px;
+      font-family: var(--font-sans);
+      border-top: 1px solid var(--border-cream);
+      margin-top: 40px;
     }
 
+    /* Responsive */
     @media (max-width: 980px) {
       .grid-3, .shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid-2 { grid-template-columns: 1fr; }
+      .hero { padding: 60px 0 40px; }
+      .hero-card { padding: 36px; }
     }
 
     @media (max-width: 640px) {
-      .hero-card { padding: 24px; border-radius: 20px; }
+      .hero-card { padding: 28px; border-radius: 24px; }
       .grid-3, .shot-grid { grid-template-columns: 1fr; }
-      h1 { font-size: clamp(28px, 9vw, 38px); }
+      h1 { font-size: clamp(28px, 9vw, 36px); }
+      h2 { font-size: clamp(24px, 7vw, 32px); }
+      .card { padding: 22px; }
+      .section { padding: 40px 0; }
+      .section-dark { padding: 60px 0; }
     }
   </style>
 </head>
@@ -267,7 +423,10 @@
         <img src="./assets/logo.png" alt="OpenClaw Launcher Logo" />
         <span>OpenClaw Launcher</span>
       </a>
-      <button id="themeToggle" class="icon-btn" type="button" aria-label="切换主题">🌙 夜间模式</button>
+      <nav class="nav-links">
+        <a class="btn btn-secondary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">下载</a>
+        <a class="btn btn-outline" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">文档</a>
+      </nav>
     </div>
   </header>
 
@@ -277,13 +436,18 @@
         <article class="hero-card">
           <h1>本地 OpenClaw + 本地 LLM，一键可视化部署</h1>
           <p class="subtitle">围绕本地化部署场景，从依赖准备、实例管理到 LlamaCPP 与模型切换，全流程图形化可控。</p>
-          <div class="chips" style="margin-bottom:14px;">
+          <div class="chips">
             <span class="chip">macOS / Windows</span>
             <span class="chip">MIT License</span>
+            <span class="chip">PySide6</span>
           </div>
           <div class="cta-row">
-            <a class="btn btn-primary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">⬇ 进入 Releases</a>
-            <a class="btn btn-outline" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">📘 查看 Wiki</a>
+            <a class="btn btn-primary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">
+              <span>进入 Releases</span>
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">
+              <span>查看 Wiki</span>
+            </a>
           </div>
         </article>
       </div>
@@ -291,38 +455,60 @@
 
     <section class="section">
       <div class="container">
-        <h2>核心功能</h2>
-        <p class="desc"></p>
+        <div class="section-header">
+          <h2>核心功能</h2>
+          <p class="desc">从初始化配置到生产运维，提供完整的一站式管理能力</p>
+        </div>
         <div class="grid-3">
-          <article class="card"><h3>🏁 引导式上手</h3><p>六步完成初始化：依赖安装、实例创建、模型配置、频道配置、启动实例、打开 WebUI。</p></article>
-          <article class="card"><h3>🧱 实例管理</h3><p>创建 / 启动 / 停止 / 删除，支持更新前自动备份、打开实例目录和 CLI。</p></article>
-          <article class="card"><h3>🩺 运行时管理</h3><p>管理 OpenClaw / Node.js（必需）与 Python / uv（可选）版本，支持下载和默认切换。</p></article>
-          <article class="card"><h3>🛰 频道配置</h3><p>按实例维护 Discord、Telegram、Feishu、DingTalk、QQ 等参数，保存前支持停机检查。</p></article>
-          <article class="card"><h3>🧠 模型与 LlamaCPP</h3><p>本地 GGUF 推理服务 + 在线/本地提供商切换（OpenAI、DeepSeek、Moonshot、Ollama、Llama.cpp）。</p></article>
-          <article class="card"><h3>🧩 插件与备份</h3><p>插件安装/卸载、推荐插件一键安装；zip 备份与恢复后自动尝试重装依赖。</p></article>
+          <article class="card">
+            <h3>引导式上手</h3>
+            <p>六步完成初始化：依赖安装、实例创建、模型配置、频道配置、启动实例、打开 WebUI。</p>
+          </article>
+          <article class="card">
+            <h3>实例管理</h3>
+            <p>创建 / 启动 / 停止 / 删除，支持更新前自动备份、打开实例目录和 CLI。</p>
+          </article>
+          <article class="card">
+            <h3>运行时管理</h3>
+            <p>管理 OpenClaw / Node.js（必需）与 Python / uv（可选）版本，支持下载和默认切换。</p>
+          </article>
+          <article class="card">
+            <h3>频道配置</h3>
+            <p>按实例维护 Discord、Telegram、Feishu、DingTalk、QQ 等参数，保存前支持停机检查。</p>
+          </article>
+          <article class="card">
+            <h3>模型与 LlamaCPP</h3>
+            <p>本地 GGUF 推理服务 + 在线/本地提供商切换（OpenAI、DeepSeek、Moonshot、Ollama、Llama.cpp）。</p>
+          </article>
+          <article class="card">
+            <h3>插件与备份</h3>
+            <p>插件安装/卸载、推荐插件一键安装；zip 备份与恢复后自动尝试重装依赖。</p>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section-dark">
       <div class="container">
-        <h2>快速开始</h2>
-        <p class="desc">与 README 保持一致：下载 → 安装 → 进入快速上手面板。</p>
+        <div class="section-header">
+          <h2>快速开始</h2>
+          <p class="desc">与 README 保持一致：下载 → 安装 → 进入快速上手面板</p>
+        </div>
         <div class="grid-2">
           <article class="card">
             <h3>1) 下载与安装</h3>
             <ol class="ol">
-              <li>进入 Releases 下载适配系统的安装包（macOS / Windows）。</li>
-              <li>macOS 将 .app 放入“应用程序”；Windows 直接运行 .exe。</li>
-              <li>首次启动建议进入“快速上手”面板。</li>
+              <li>进入 Releases 下载适配系统的安装包（macOS / Windows）</li>
+              <li>macOS 将 .app 放入"应用程序"；Windows 直接运行 .exe</li>
+              <li>首次启动建议进入"快速上手"面板</li>
             </ol>
           </article>
           <article class="card">
-            <h3>2) 初始化</h3>
+            <h3>2) 初始化配置</h3>
             <ol class="ol">
-              <li>先在确认 Node.js / OpenClaw 依赖状态，然后创建实例。</li>
-              <li>在“LlamaCPP + 模型切换”完成本地或在线模型配置。</li>
-              <li>配置频道后运行实例，最后在日志与备份面板做运行保障。</li>
+              <li>先确认 Node.js / OpenClaw 依赖状态，然后创建实例</li>
+              <li>在"LlamaCPP + 模型切换"完成本地或在线模型配置</li>
+              <li>配置频道后运行实例，在日志与备份面板做运行保障</li>
             </ol>
           </article>
         </div>
@@ -331,55 +517,56 @@
 
     <section class="section">
       <div class="container">
-        <h2>面板截图</h2>
-        <p class="desc"></p>
+        <div class="section-header">
+          <h2>面板截图</h2>
+          <p class="desc">直观的图形界面，覆盖完整的运维管理场景</p>
+        </div>
         <div class="shot-grid">
-          <article class="shot"><img src="./assets/onboard.png" alt="快速上手" loading="lazy" /><p>快速上手</p></article>
-          <article class="shot"><img src="./assets/channels.png" alt="频道配置" loading="lazy" /><p>频道配置</p></article>
-          <article class="shot"><img src="./assets/llamacpp.png" alt="LlamaCPP" loading="lazy" /><p>LlamaCPP</p></article>
-          <article class="shot"><img src="./assets/models.png" alt="模型切换" loading="lazy" /><p>模型切换</p></article>
-          <article class="shot"><img src="./assets/instance.png" alt="实例管理" loading="lazy" /><p>实例管理</p></article>
-          <article class="shot"><img src="./assets/env.png" alt="依赖检查" loading="lazy" /><p>依赖检查</p></article>
-          <article class="shot"><img src="./assets/backup.png" alt="备份管理" loading="lazy" /><p>备份管理</p></article>
-          <article class="shot"><img src="./assets/log.png" alt="日志查看" loading="lazy" /><p>日志查看</p></article>
-          <article class="shot"><img src="./assets/plugin.png" alt="插件管理" loading="lazy" /><p>插件管理</p></article>
-          <article class="shot"><img src="./assets/advanced.png" alt="高级设置" loading="lazy" /><p>高级设置</p></article>
+          <article class="shot">
+            <img src="./assets/onboard.png" alt="快速上手" loading="lazy" />
+            <p>快速上手</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/channels.png" alt="频道配置" loading="lazy" />
+            <p>频道配置</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/llamacpp.png" alt="LlamaCPP" loading="lazy" />
+            <p>LlamaCPP</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/models.png" alt="模型切换" loading="lazy" />
+            <p>模型切换</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/instance.png" alt="实例管理" loading="lazy" />
+            <p>实例管理</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/env.png" alt="依赖检查" loading="lazy" />
+            <p>依赖检查</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/backup.png" alt="备份管理" loading="lazy" />
+            <p>备份管理</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/log.png" alt="日志查看" loading="lazy" />
+            <p>日志查看</p>
+          </article>
+          <article class="shot">
+            <img src="./assets/plugin.png" alt="插件管理" loading="lazy" />
+            <p>插件管理</p>
+          </article>
         </div>
       </div>
     </section>
   </main>
 
   <footer>
-    OpenClaw Launcher © Shinnpuru 2026
+    <div class="container">
+      OpenClaw Launcher &copy; Shinnpuru 2026
+    </div>
   </footer>
-
-  <script>
-    (function () {
-      const root = document.documentElement;
-      const button = document.getElementById('themeToggle');
-      const key = 'ocl-theme';
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const saved = localStorage.getItem(key);
-      const initTheme = saved || (prefersDark ? 'dark' : 'light');
-
-      function applyTheme(theme) {
-        if (theme === 'dark') {
-          root.setAttribute('data-theme', 'dark');
-          button.textContent = '☀ 白天模式';
-        } else {
-          root.removeAttribute('data-theme');
-          button.textContent = '🌙 夜间模式';
-        }
-      }
-
-      applyTheme(initTheme);
-
-      button.addEventListener('click', function () {
-        const nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        localStorage.setItem(key, nextTheme);
-        applyTheme(nextTheme);
-      });
-    })();
-  </script>
 </body>
 </html>
