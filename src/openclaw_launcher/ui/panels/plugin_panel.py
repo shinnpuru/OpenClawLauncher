@@ -507,6 +507,12 @@ class PluginPanel(QWidget):
             plugin_name=plugin_name,
             plugin_path=plugin_path,
         )
+        try:
+            worker.setParent(self)
+            worker.finished.connect(worker.deleteLater)
+        except Exception:
+            pass
+
         worker.completed.connect(self.on_uninstall_finished)
         worker.error.connect(self.on_uninstall_error)
         worker.finished.connect(self._cleanup_uninstall_worker)
@@ -605,6 +611,12 @@ class PluginPanel(QWidget):
             plugin_name=plugin_name,
             instance_name=instance_name,
         )
+        try:
+            worker.setParent(self)
+            worker.finished.connect(worker.deleteLater)
+        except Exception:
+            pass
+
         worker.completed.connect(lambda output, name=plugin_name: self.on_install_success(name, output))
         worker.error.connect(lambda error, name=plugin_name: self.on_install_error(name, error))
         worker.finished.connect(self._cleanup_install_worker)

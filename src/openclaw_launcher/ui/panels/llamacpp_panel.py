@@ -417,6 +417,11 @@ class LlamaCppTab(QWidget):
             n_gpu_layers=gpu_layers,
             extra_params=extra_params,
         )
+        try:
+            self.worker.setParent(self)
+            self.worker.finished.connect(self.worker.deleteLater)
+        except Exception:
+            pass
         self.worker.output_ready.connect(self.on_output)
         self.worker.process_started.connect(self.on_process_started)
         self.worker.process_stopped.connect(self.on_process_stopped)

@@ -259,6 +259,13 @@ class InstancePanel(QWidget):
         self.btn_create.setEnabled(False)
 
         self.worker = InstanceCreateWorker(name, port)
+        # Ensure Qt ownership and safe deletion when finished
+        try:
+            self.worker.setParent(self)
+            self.worker.finished.connect(self.worker.deleteLater)
+        except Exception:
+            pass
+
         self.worker.finished.connect(lambda: self.on_create_finished(name))
         self.worker.error.connect(lambda msg: self.on_create_error(name, msg))
         self.worker.start()
@@ -330,6 +337,11 @@ class InstancePanel(QWidget):
         self.backup_worker.progress_percentage.connect(self._on_backup_progress)
         self.backup_worker.finished.connect(lambda instance_name: self._on_backup_finished_for_update(instance_name))
         self.backup_worker.error.connect(lambda error_msg: self._on_backup_error_for_update(error_msg))
+        try:
+            self.backup_worker.setParent(self)
+            self.backup_worker.finished.connect(self.backup_worker.deleteLater)
+        except Exception:
+            pass
         self.backup_progress.setVisible(True)
         self.backup_progress.setValue(0)
         self.backup_worker.start()
@@ -370,6 +382,12 @@ class InstancePanel(QWidget):
         self.update_progress.setFormat(i18n.t("progress_update_preparing"))
 
         self.worker = InstanceUpdateWorker(name)
+        try:
+            self.worker.setParent(self)
+            self.worker.finished.connect(self.worker.deleteLater)
+        except Exception:
+            pass
+
         self.worker.finished.connect(lambda new_name: self.on_update_finished(name, new_name))
         self.worker.error.connect(lambda msg: self.on_update_error(name, msg))
         self.worker.progress.connect(self.on_update_progress)
@@ -451,6 +469,12 @@ class InstancePanel(QWidget):
         self.delete_progress.setFormat(i18n.t("progress_delete_running"))
 
         self.worker = InstanceDeleteWorker(name)
+        try:
+            self.worker.setParent(self)
+            self.worker.finished.connect(self.worker.deleteLater)
+        except Exception:
+            pass
+
         self.worker.finished.connect(self.on_delete_finished)
         self.worker.error.connect(self.on_delete_error)
         self.worker.start()

@@ -574,6 +574,11 @@ class ModelSwitchTab(QWidget):
         self.apply_btn.setEnabled(False)
 
         self.worker = ModelSwitchWorker(instance_name, provider_key, config)
+        try:
+            self.worker.setParent(self)
+            self.worker.finished.connect(self.worker.deleteLater)
+        except Exception:
+            pass
         self.worker.progress.connect(self.on_progress)
         self.worker.finished_success.connect(self.on_success)
         self.worker.error_occurred.connect(self.on_error)

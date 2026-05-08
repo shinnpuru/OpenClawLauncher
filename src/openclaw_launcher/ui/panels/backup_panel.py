@@ -228,6 +228,11 @@ class BackupPanel(QWidget):
         self.backup_worker.progress_percentage.connect(self.on_backup_progress_percentage)
         self.backup_worker.finished.connect(self.on_backup_finished)
         self.backup_worker.error.connect(self.on_backup_error)
+        try:
+            self.backup_worker.setParent(self)
+            self.backup_worker.finished.connect(self.backup_worker.deleteLater)
+        except Exception:
+            pass
         self.progress_backup.setVisible(True)
         self.progress_backup.setValue(0)
         self.backup_worker.start()
@@ -278,6 +283,11 @@ class BackupPanel(QWidget):
         self.restore_worker.progress_percentage.connect(self.on_restore_progress_percentage)
         self.restore_worker.finished.connect(self.on_restore_finished)
         self.restore_worker.error.connect(self.on_restore_error)
+        try:
+            self.restore_worker.setParent(self)
+            self.restore_worker.finished.connect(self.restore_worker.deleteLater)
+        except Exception:
+            pass
         self.progress_restore.setVisible(True)
         self.progress_restore.setValue(0)
         self.restore_worker.start()
