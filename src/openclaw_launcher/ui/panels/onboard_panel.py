@@ -401,7 +401,7 @@ class OnboardPanel(QWidget):
         if self.one_click_worker and self.one_click_worker.isRunning():
             self.lbl_status.setText(i18n.t("onboard_status_creating_sample", name=self.SAMPLE_INSTANCE_NAME))
         elif running_done:
-            self.lbl_status.setText(i18n.t("onboard_all_done"))
+            self.lbl_status.setText(i18n.t("onboard_done"))
         elif not deps_done:
             self.lbl_status.setText("")
         elif not sample_done:
@@ -441,7 +441,6 @@ class OnboardPanel(QWidget):
         if self._sample_running():
             try:
                 ProcessManager.stop_instance(self.SAMPLE_INSTANCE_NAME)
-                QMessageBox.information(self, i18n.t("title_success"), i18n.t("onboard_msg_instance_stopped", name=self.SAMPLE_INSTANCE_NAME))
             except Exception as e:
                 QMessageBox.critical(self, i18n.t("title_error"), str(e))
             self.refresh_status()

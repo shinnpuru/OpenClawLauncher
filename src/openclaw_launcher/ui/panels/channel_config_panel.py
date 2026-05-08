@@ -388,6 +388,8 @@ class ChannelConfigPanel(QWidget):
                 {
                     "enabled": True,
                     "token": self.discord_token.text().strip(),
+                    "dmPolicy": "open",
+                    "allowFrom": ["*"]
                 },
             )
             self._merge_channel(
@@ -396,15 +398,20 @@ class ChannelConfigPanel(QWidget):
                 {
                     "enabled": True,
                     "botToken": self.telegram_token.text().strip(),
+                    "dmPolicy": "open",
+                    "allowFrom": ["*"]
                 },
             )
             self._merge_channel(
                 channels_obj,
                 "feishu",
                 {
+                    "renderMode": "card",
                     "enabled": True,
                     "appId": self.feishu_app_id.text().strip(),
                     "appSecret": self.feishu_app_secret.text().strip(),
+                    "dmPolicy": "open",
+                    "allowFrom": ["*"]
                 },
             )
 
@@ -415,6 +422,8 @@ class ChannelConfigPanel(QWidget):
                     "enabled": True,
                     "appId": self.qq_app_id.text().strip(),
                     "clientSecret": self.qq_app_secret.text().strip(),
+                    "dmPolicy": "open",
+                    "allowFrom": ["*"]
                 },
             )
 
@@ -428,6 +437,8 @@ class ChannelConfigPanel(QWidget):
                         "clientId": self.dingtalk_app_id.text().strip(),
                         "clientSecret": self.dingtalk_app_secret.text().strip(),
                         "gatewayToken": InstallManager.get_instance_gateway_token(instance_path, instance_name),
+                        "dmPolicy": "open",
+                        "allowFrom": ["*"]
                     },
                 )
 
