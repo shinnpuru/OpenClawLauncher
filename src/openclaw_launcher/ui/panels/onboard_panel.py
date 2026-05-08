@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
 )
 from PySide6.QtCore import QThread, Signal, QTimer, Qt
-from PySide6.QtGui import QDesktopServices, QPixmap
+from PySide6.QtGui import QDesktopServices, QPixmap, QImageReader
 from PySide6.QtCore import QUrl
 from pathlib import Path
 
@@ -256,21 +256,31 @@ class OnboardPanel(QWidget):
 
         self.layout = QVBoxLayout(self)
 
-        self.lbl_title = QLabel(i18n.t("onboard_title"))
-        self.lbl_title.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.layout.addWidget(self.lbl_title)
-
         # Logo above the primary action
         self.lbl_logo = QLabel()
-        logo_path = Path(__file__).resolve().parents[4] / "logo.png"
+        self.lbl_logo.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.lbl_logo.setStyleSheet("background: transparent;")
+        logo_path = Path(__file__).resolve().parents[4] / "teaser.png"
         if logo_path.exists():
-            logo_pixmap = QPixmap(str(logo_path))
-            if not logo_pixmap.isNull():
-                self.lbl_logo.setPixmap(logo_pixmap.scaledToWidth(180))
+            reader = QImageReader(str(logo_path))
+            reader.setAutoTransform(True)
+            image = reader.read()
+            if not image.isNull():
+                logo_pixmap = QPixmap.fromImage(image)
                 self.lbl_logo.setAlignment(Qt.AlignCenter)
+                self.lbl_logo.setScaledContents(False)
+                dpr = max(1.0, float(self.devicePixelRatioF()))
+                target_width = int(180 * dpr)
+                self.lbl_logo.setPixmap(
+                    logo_pixmap.scaledToWidth(target_width, Qt.SmoothTransformation)
+                )
         self.layout.addWidget(self.lbl_logo)
 
         self.layout.addStretch()
+
+        self.lbl_title = QLabel(i18n.t("onboard_title"))
+        self.lbl_title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.layout.addWidget(self.lbl_title)
 
         # Main unified progress (used by one-click flow)
         self.progress_main = QProgressBar()

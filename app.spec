@@ -8,6 +8,7 @@ datas = [
     ("src/openclaw_launcher/ui/i18n", "openclaw_launcher/ui/i18n"),
     ("llama", "llama"),
     ("logo.png", "."),
+    ("teaser.png", "."),
 ]
 
 icon_file = "logo.ico" if sys.platform.startswith("win") else "logo.png"

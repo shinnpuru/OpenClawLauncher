@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="logo.png" alt="OpenClaw Launcher Logo" width="160" />
+	<img src="teaser.png" alt="OpenClaw Launcher Logo" />
 </p>
 
 <h1 align="center">OpenClaw Launcher</h1>
@@ -14,7 +14,7 @@
 
 ## Key Features
 
-- **Guided Onboarding**: The Onboard panel now covers a 6-step flow (install dependencies, create instance, configure LlamaCPP/model, configure channels, start instance, open WebUI).
+- **One-click Onboarding**: The Onboard panel use one-click setup.
 - **Instance Management**: Create/start/stop/delete instances, with optional pre-update backup, open-folder action, and instance CLI launcher.
 - **Runtime Management**: Manage OpenClaw / Node.js (required) and Python / uv (optional) in Dependencies, including download and default-version switching.
 - **Channel Configuration**: Configure Discord / Telegram / Feishu / DingTalk / QQ credentials per instance in Channels, with stop-before-save safeguards.
@@ -40,11 +40,12 @@ Install with your platform package:
 
 ### 3) Use
 
-After launching `OpenClaw Launcher`:
+Start with the **Onboard** panel for first-run initialization. Tutorial: [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)
 
-- Start with the **Onboard** panel for first-run initialization. Tutorial: [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)
+### 3) Configure and Manage
+
 - Confirm Node.js / OpenClaw (required) and Python / uv (optional) in **Dependencies**.
-- Configure local or online model settings in **LlamaCPP** and **Model Switch**.
+- Configure local or online model settings in **LocalLLM** and **Model Switch**.
 - Configure bot channels in **Channels**.
 - Create and run instances in **Instances**, then update version or open folder/CLI when needed.
 - Install required extensions in **Plugins**.
