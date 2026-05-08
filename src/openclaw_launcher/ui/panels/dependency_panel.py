@@ -308,6 +308,13 @@ class DependencyPanel(QWidget):
         self.progress_dialog.show()
         
         self.download_worker = DownloadWorker(self.runtime_manager, software, version)
+        # Ensure Qt ownership and automatic safe deletion when finished
+        try:
+            self.download_worker.setParent(self)
+            self.download_worker.finished.connect(self.download_worker.deleteLater)
+        except Exception:
+            pass
+
         self.download_worker.progress.connect(self.on_download_progress)
         self.download_worker.completed.connect(self.on_download_finished)
         self.download_worker.error.connect(self.on_download_error)

@@ -7,12 +7,13 @@ import tarfile
 import zipfile
 import urllib.request
 import urllib.parse
+import urllib.error
 import ssl
 import sys
 import re
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Iterable
 from datetime import datetime
 from .config import Config
 
@@ -223,6 +224,125 @@ class RuntimeManager:
             
         return ""
 
+    def _get_npm_registry(self) -> str:
+        value = Config.get_setting("npm_registry", "")
+        if not isinstance(value, str):
+            return ""
+        return value.strip().rstrip("/")
+
+    def _normalize_openclaw_versions(
+        self,
+        version_list: Iterable[str],
+        time_map: Optional[Dict[str, str]] = None,
+    ) -> List[Dict]:
+        prerelease_keywords = ("beta", "alpha", "rc", "preview", "dev", "canary", "next")
+        valid_versions = [
+            v
+            for v in version_list
+            if isinstance(v, str)
+            and v
+            and v[0].isdigit()
+            and not any(keyword in v.lower() for keyword in prerelease_keywords)
+        ]
+        valid_versions.sort(key=self._natural_version_key, reverse=True)
+        valid_versions = valid_versions[:10]
+
+        normalized: List[Dict] = []
+        for ver in valid_versions:
+            date_value = "Unknown"
+            if isinstance(time_map, dict):
+                raw_time = str(time_map.get(ver, "")).strip()
+                if raw_time:
+                    # npm registry time field is usually ISO-8601. Keep date portion only.
+                    date_value = raw_time[:10]
+            if date_value == "Unknown":
+                date_value = self._date_from_openclaw_tag(ver)
+
+            normalized.append(
+                {
+                    "version": ver,
+                    "date": date_value,
+                }
+            )
+
+        return normalized
+
+    def _fetch_openclaw_versions_via_registry(self) -> List[Dict]:
+        npm_registry = self._get_npm_registry() or "https://registry.npmjs.org"
+        url = f"{npm_registry}/openclaw"
+
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "OpenClawLauncher/1.0",
+            },
+        )
+
+        payload = None
+        last_exc: Optional[Exception] = None
+
+        # Try multiple SSL contexts / strategies to work around platform TLS incompatibilities
+        contexts: List[ssl.SSLContext] = []
+        try:
+            contexts.append(ssl._create_unverified_context())
+        except Exception:
+            pass
+
+        try:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            try:
+                ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+            except Exception:
+                # set_ciphers may not be available on some platforms
+                pass
+            contexts.append(ctx)
+        except Exception:
+            pass
+
+        for ctx in contexts:
+            try:
+                with urllib.request.urlopen(request, timeout=20, context=ctx) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except Exception as e:
+                last_exc = e
+
+        # If HTTP-based fetch failed, try npm as a fallback (if npm/runtime available)
+        if payload is None:
+            try:
+                npm_registry = self._get_npm_registry() or "https://registry.npmjs.org"
+                npm_cmd = self._find_runtime_npm()
+                node_ver = self.get_default_version(self.SOFTWARE_NODE)
+                if node_ver:
+                    exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
+                    cmd = [str(exe_path), npm_cmd, "view", "openclaw", "versions", "--json", "--registry", npm_registry]
+                    res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+                    versions = json.loads(res.stdout)
+                    if isinstance(versions, list):
+                        return self._normalize_openclaw_versions(versions)
+            except Exception:
+                # ignore and re-raise original error below
+                pass
+
+            if last_exc:
+                raise last_exc
+            raise RuntimeError("Failed to fetch OpenClaw registry payload")
+
+        versions_obj = payload.get("versions", {})
+        if isinstance(versions_obj, dict):
+            versions = list(versions_obj.keys())
+        else:
+            versions = []
+
+        time_map = payload.get("time", {})
+        if not isinstance(time_map, dict):
+            time_map = {}
+
+        return self._normalize_openclaw_versions(versions, time_map=time_map)
+
     def get_installed_versions(self, software: str) -> List[Dict]:
         versions = []
         if not self.RUNTIME_BASE_DIR.exists():
@@ -302,14 +422,14 @@ class RuntimeManager:
         candidates = []
         if platform.system() == "Windows":
             candidates = [
+                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
                 node_bin_dir / "npm.cmd",
                 node_bin_dir / "npm.exe",
-                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
             ]
         else:
             candidates = [
-                node_bin_dir / "npm",
                 runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+                node_bin_dir / "npm",
             ]
 
         for candidate in candidates:
@@ -318,57 +438,29 @@ class RuntimeManager:
 
         raise FileNotFoundError("npm not found in Node runtime")
 
-    def _fetch_openclaw_versions(self) -> List[Dict]:
-        versions = []
+    def _fetch_openclaw_versions(self) -> Optional[List[Dict]]:
+        logger.info("Fetching OpenClaw versions from npm registry")
 
         try:
-            logger.info("Fetching OpenClaw versions from npm registry")
-            npm_cmd = self._find_runtime_npm()
-            # If it's a .js file, we need to run it with node
-            if npm_cmd.endswith(".js"):
-                node_ver = self.get_default_version(self.SOFTWARE_NODE)
-                exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
-                cmd = [str(exe_path), npm_cmd, "view", "openclaw", "versions", "--json"]
-            else:
-                cmd = [npm_cmd, "view", "openclaw", "versions", "--json"]
+            registry_versions = self._fetch_openclaw_versions_via_registry()
+            logger.info(f"Fetched {len(registry_versions)} OpenClaw versions from npm registry API")
+            return registry_versions
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError) as registry_error:
+            logger.warning(f"Failed to fetch OpenClaw versions from npm registry API: {registry_error}")
+        except Exception as registry_error:
+            logger.warning(f"Unexpected error while fetching OpenClaw versions from npm registry API: {registry_error}")
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=30,
-            )
-            version_list = json.loads(result.stdout)
-            if isinstance(version_list, list):
-                # Filter versions that look like valid releases (start with digit) and exclude prerelease versions
-                prerelease_keywords = ("beta", "alpha", "rc", "preview", "dev", "canary", "next")
-                valid_versions = [
-                    v for v in version_list
-                    if isinstance(v, str) and v and v[0].isdigit()
-                    and not any(keyword in v.lower() for keyword in prerelease_keywords)
-                ]
-                # Sort and take latest 10
-                valid_versions.sort(key=self._natural_version_key, reverse=True)
-                valid_versions = valid_versions[:10]
-
-                for ver in valid_versions:
-                    versions.append({
-                        "version": ver,
-                        "date": ver,
-                    })
-
-            logger.info(f"Fetched {len(versions)} OpenClaw versions from npm")
-        except Exception as e:
-            logger.warning(f"Failed to fetch OpenClaw versions from npm: {e}")
-
-        return versions
+        return None
 
     def refresh_available_versions(self, software: str):
         if software != self.SOFTWARE_OPENCLAW:
             return
 
         versions = self._fetch_openclaw_versions()
+        if versions is None:
+            logger.warning("OpenClaw versions refresh failed; keeping previously cached versions")
+            return
+
         self._remote_versions_cache[software] = versions
         refreshed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._remote_versions_refreshed_at[software] = refreshed_at
@@ -406,6 +498,21 @@ class RuntimeManager:
         except Exception:
             pass
 
+    @classmethod
+    def _delete_path(cls, path: Path):
+        if not path.exists() and not path.is_symlink():
+            return
+
+        try:
+            if path.is_dir() and not path.is_symlink():
+                for child in path.iterdir():
+                    cls._delete_path(child)
+                path.rmdir()
+            else:
+                path.unlink()
+        except FileNotFoundError:
+            pass
+
     def _download_file(self, url: str, dest: Path, callback=None):
         logger.info(f"Downloading {url} to {dest}")
         try:
@@ -429,53 +536,49 @@ class RuntimeManager:
 
     def _extract_archive(self, archive_path: Path, dest_dir: Path):
         logger.info(f"Extracting {archive_path} to {dest_dir}")
-        temp_extract = dest_dir / "_temp_extract"
-        temp_extract.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            if str(archive_path).endswith("tar.gz") or str(archive_path).endswith("tgz"):
-                with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(path=temp_extract)
-            elif str(archive_path).endswith("zip"):
-                with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_extract)
-            
-            # Flatten logic with safe copy to handle long paths and cross-device moves
-            def _safe_move(src: Path, dst_dir: Path):
-                dst = dst_dir / src.name
-                # Ensure destination parent exists
-                dst.parent.mkdir(parents=True, exist_ok=True)
+        archive_name = archive_path.name.lower()
+        is_openclaw_archive = archive_name.startswith("openclaw-")
 
-                try:
-                    if src.is_dir():
-                        # Use copytree with dirs_exist_ok to merge/overwrite if needed
-                        shutil.copytree(src, dst, dirs_exist_ok=True)
-                        try:
-                            shutil.rmtree(src)
-                        except Exception:
-                            pass
-                    else:
-                        shutil.copy2(src, dst)
-                        try:
-                            src.unlink()
-                        except Exception:
-                            pass
-                except Exception:
-                    # Surface the error so caller can handle/report it
-                    raise
+        def _is_ignored_artifact(name: str) -> bool:
+            return name.startswith("._") or name in {".ds_store", "__macosx", ".appledouble"}
 
-            items = list(temp_extract.iterdir())
-            if len(items) == 1 and items[0].is_dir():
-                source = items[0]
-                for item in source.iterdir():
-                    _safe_move(item, dest_dir)
-            else:
-                for item in temp_extract.iterdir():
-                    _safe_move(item, dest_dir)
-                    
-        finally:
-            if temp_extract.exists():
-                shutil.rmtree(temp_extract)
+        def _safe_target_path(relative_name: str) -> Path:
+            target_path = dest_dir / relative_name
+            resolved_target = target_path.resolve(strict=False)
+            resolved_dest = dest_dir.resolve(strict=False)
+            if resolved_target != resolved_dest and resolved_dest not in resolved_target.parents:
+                raise RuntimeError(f"Unsafe archive member path: {relative_name}")
+            return target_path
+
+        def _strip_openclaw_prefix(member_name: str) -> Optional[str]:
+            normalized = member_name.replace("\\", "/").lstrip("/")
+            if not normalized:
+                return None
+
+            if is_openclaw_archive:
+                if normalized == "package":
+                    return None
+                if normalized.startswith("package/"):
+                    stripped = normalized[len("package/"):]
+                    return stripped or None
+                return None
+
+            return normalized
+
+        if str(archive_path).endswith("tar.gz") or str(archive_path).endswith("tgz"):
+            with tarfile.open(archive_path, "r:gz") as tar:
+                for member in tar.getmembers():
+                    if member.isdir() or member.issym() or member.islnk() or member.isfile():
+                        target_name = _strip_openclaw_prefix(member.name)
+                        if not target_name or _is_ignored_artifact(Path(target_name).name):
+                            continue
+                        member.name = target_name
+                        target_path = _safe_target_path(target_name)
+                        target_path.parent.mkdir(parents=True, exist_ok=True)
+                        tar.extract(member, path=dest_dir)
+        elif str(archive_path).endswith("zip"):
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(dest_dir)
 
     def install_version(self, software: str, version: str, callback=None):
         target_dir = self.RUNTIME_BASE_DIR / f"{software}-{version}"
@@ -500,13 +603,11 @@ class RuntimeManager:
                 self._emit_progress(callback, "download", 0, None, f"Downloading openclaw@{version}")
                 try:
                     npm_cmd = self._find_runtime_npm()
-                    # If it's a .js file, we need to run it with node
-                    if npm_cmd.endswith(".js"):
-                        node_ver = self.get_default_version(self.SOFTWARE_NODE)
-                        exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
-                        cmd = [str(exe_path), npm_cmd, "pack", f"openclaw@{version}"]
-                    else:
-                        cmd = [npm_cmd, "pack", f"openclaw@{version}"]
+                    node_ver = self.get_default_version(self.SOFTWARE_NODE)
+                    if not node_ver:
+                        raise RuntimeError("No Node runtime installed")
+                    exe_path = self.get_executable_path(self.SOFTWARE_NODE, node_ver)
+                    cmd = [str(exe_path), npm_cmd, "pack", f"openclaw@{version}"]
 
                     pack_result = subprocess.run(
                         cmd,
@@ -557,12 +658,12 @@ class RuntimeManager:
         except Exception as e:
             logger.error(f"Installation failed: {e}")
             if target_dir.exists():
-                shutil.rmtree(target_dir)
+                self._delete_path(target_dir)
             raise e
         finally:
             if temp_dir.exists():
                 try:
-                    shutil.rmtree(temp_dir)
+                    self._delete_path(temp_dir)
                 except:
                     pass
 

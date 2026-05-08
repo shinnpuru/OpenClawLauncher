@@ -32,3 +32,5 @@ config.json
 *.lock
 .pnpm-store
 llama/
+._*
+*.gguf

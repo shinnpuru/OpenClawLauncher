@@ -215,7 +215,7 @@ class AdvancedPanel(QWidget):
 
     def load_settings(self):
         self.chk_minimize_tray.setChecked(Config.get_setting("minimize_to_tray", False))
-        self.chk_check_updates.setChecked(Config.get_setting("check_updates", True))
+        self.chk_check_updates.setChecked(Config.get_setting("check_updates", False))
         self.chk_windows_patch.setChecked(Config.get_setting("windows_a2ui_patch", True))
         self.chk_auto_start_llamacpp.setChecked(Config.get_setting("auto_start_llamacpp", False))
         self.chk_start_minimized.setChecked(Config.get_setting("start_minimized", False))
