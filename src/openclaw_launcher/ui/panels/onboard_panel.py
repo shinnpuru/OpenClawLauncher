@@ -20,6 +20,22 @@ from ..i18n import i18n
 from datetime import datetime
 
 
+def _resolve_logo_path() -> str | None:
+    candidates = []
+    import sys, os
+    if hasattr(sys, "_MEIPASS"):
+        candidates.append(os.path.join(sys._MEIPASS, "teaser.png"))
+
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",  "..", ".."))
+    candidates.append(os.path.join(project_root, "teaser.png"))
+
+    candidates.append(os.path.join(os.getcwd(), "teaser.png"))
+
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
 class InstallDependenciesWorker(QThread):
     completed = Signal()
     error = Signal(str)
@@ -260,9 +276,9 @@ class OnboardPanel(QWidget):
         self.lbl_logo = QLabel()
         self.lbl_logo.setAttribute(Qt.WA_TranslucentBackground, True)
         self.lbl_logo.setStyleSheet("background: transparent;")
-        logo_path = Path(__file__).resolve().parents[4] / "teaser.png"
-        if logo_path.exists():
-            reader = QImageReader(str(logo_path))
+        logo_path = _resolve_logo_path()
+        if logo_path:
+            reader = QImageReader(logo_path)
             reader.setAutoTransform(True)
             image = reader.read()
             if not image.isNull():
