@@ -20,13 +20,15 @@ from ..i18n import i18n
 
 
 class ChannelConfigPanel(QWidget):
-    DINGTALK_PLUGIN = "@dingtalk-real-ai/dingtalk-connector"
+    DINGTALK_PLUGIN = "dingtalk-connector"
+    WEIXIN_PLUGIN = "openclaw-weixin"
     telegram_KEYS = ("telegram", "telegram")
 
     def __init__(self):
         super().__init__()
         self._active_telegram_key = "telegram"
         self._dingtalk_available = False
+        self._weixin_available = False
 
         self.layout = QVBoxLayout(self)
 
@@ -100,6 +102,21 @@ class ChannelConfigPanel(QWidget):
         self.dingtalk_hint.setWordWrap(True)
         group_layout.addWidget(self.dingtalk_hint)
 
+        self.weixin_login_row = QHBoxLayout()
+        self.weixin_login_label = QLabel()
+        self.weixin_login_row.addWidget(self.weixin_login_label)
+        self.weixin_login_row.addStretch()
+
+        self.btn_weixin_login = QPushButton(i18n.t("btn_channel_login"))
+        self.btn_weixin_login.clicked.connect(self.login_weixin_channel)
+        self.weixin_login_row.addWidget(self.btn_weixin_login)
+        group_layout.addLayout(self.weixin_login_row)
+
+        self.weixin_hint = QLabel("")
+        self.weixin_hint.setStyleSheet("color: orange;")
+        self.weixin_hint.setWordWrap(True)
+        group_layout.addWidget(self.weixin_hint)
+
         self.btn_save = QPushButton(i18n.t("btn_save"))
         self.btn_save.clicked.connect(self.save_channel_config)
         self.layout.addWidget(self.btn_save)
@@ -119,6 +136,7 @@ class ChannelConfigPanel(QWidget):
         self.dingtalk_app_secret_label.setText(f"{i18n.t('channel_dingtalk')} {i18n.t('lbl_app_secret')}")
         self.qq_app_id_label.setText(f"{i18n.t('channel_qq')} {i18n.t('lbl_app_id')}")
         self.qq_app_secret_label.setText(f"{i18n.t('channel_qq')} {i18n.t('lbl_app_secret')}")
+        self.weixin_login_label.setText(i18n.t("channel_weixin"))
 
     def _load_instances(self, selected_name: str | None = None):
         self.instance_selector.blockSignals(True)
@@ -150,37 +168,48 @@ class ChannelConfigPanel(QWidget):
             return None
         return Config.get_instance_path(instance_name)
 
-    def _candidate_extension_dirs(self, base_dir: Path):
-        return [
-            (base_dir / ".openclaw" / "extensions").resolve(),
-            (base_dir / "extensions").resolve(),
-        ]
-
     def _is_plugin_installed(self, plugin_name: str) -> bool:
         instance_path = self._get_selected_instance_path()
         if not instance_path:
             return False
 
         normalized = plugin_name.strip().lower()
-        path_parts = [part for part in plugin_name.split("/") if part]
-        short_name = path_parts[-1].lower() if path_parts else ""
-        if not short_name:
+        if not normalized:
             return False
 
-        for source_dir in self._candidate_extension_dirs(instance_path):
-            if not source_dir.exists() or not source_dir.is_dir():
-                continue
+        installs_path = instance_path / ".openclaw" / "plugins" / "installs.json"
+        if not installs_path.exists():
+            return False
 
-            # 1) Direct match for full package path, e.g. @scope/name
-            if path_parts:
-                plugin_dir = source_dir.joinpath(*path_parts)
-                if plugin_dir.exists() and plugin_dir.is_dir():
+        try:
+            loaded = json.loads(installs_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+
+        if not isinstance(loaded, dict):
+            return False
+
+        install_records = loaded.get("installRecords")
+        if not isinstance(install_records, dict):
+            return False
+
+        for record_key, record in install_records.items():
+            candidates = []
+            if isinstance(record_key, str):
+                candidates.append(record_key)
+
+            if isinstance(record, dict):
+                for field in ("spec", "resolvedName", "resolvedSpec", "packageName", "name", "pluginId"):
+                    value = record.get(field)
+                    if isinstance(value, str):
+                        candidates.append(value)
+
+            for candidate in candidates:
+                candidate_lower = candidate.strip().lower()
+                if candidate_lower == normalized:
                     return True
-
-            # 2) Direct match for unscoped folder, e.g. name
-            direct_short_dir = source_dir / short_name
-            if direct_short_dir.exists() and direct_short_dir.is_dir():
-                return True
+                if candidate_lower.startswith(f"{normalized}@"):
+                    return True
 
         return False
 
@@ -190,11 +219,16 @@ class ChannelConfigPanel(QWidget):
 
     def _update_plugin_gate_state(self):
         self._dingtalk_available = self._is_plugin_installed(self.DINGTALK_PLUGIN)
+        self._weixin_available = self._is_plugin_installed(self.WEIXIN_PLUGIN)
 
         self._set_field_pair_enabled(self.dingtalk_app_id, self.dingtalk_app_secret, self._dingtalk_available)
+        self.btn_weixin_login.setEnabled(self._weixin_available)
 
         self.dingtalk_hint.setText(
             "" if self._dingtalk_available else i18n.t("msg_channel_requires_plugin_dingtalk")
+        )
+        self.weixin_hint.setText(
+            "" if self._weixin_available else i18n.t("msg_channel_requires_plugin_weixin")
         )
 
     def _update_controls_state(self):
@@ -417,6 +451,31 @@ class ChannelConfigPanel(QWidget):
                 i18n.t("msg_channel_config_save_failed_with_error", error=str(e)),
             )
 
+    def login_weixin_channel(self):
+        instance_path = self._get_selected_instance_path()
+        instance_name = self.instance_selector.currentData()
+        if not instance_path or not instance_name:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_select_instance_required"))
+            return
+
+        if not self._weixin_available:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_channel_requires_plugin_weixin"))
+            return
+
+        try:
+            ProcessManager.launch_instance_cli_with_command(
+                instance_name,
+                instance_path,
+                ["channels", "login", "--channel", "openclaw-weixin"],
+            )
+            self.status_label.setText(i18n.t("msg_weixin_login_cli_launched", name=instance_name))
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                i18n.t("title_error"),
+                i18n.t("msg_weixin_login_cli_launch_failed", error=str(e)),
+            )
+
     def update_ui_texts(self):
         self.instance_label.setText(i18n.t("lbl_select_instance"))
         if self.instance_selector.count() > 0:
@@ -431,5 +490,6 @@ class ChannelConfigPanel(QWidget):
         self.dingtalk_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
         self.qq_app_id.setPlaceholderText(i18n.t("ph_app_id"))
         self.qq_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
+        self.btn_weixin_login.setText(i18n.t("btn_channel_login"))
         self.btn_save.setText(i18n.t("btn_save"))
         self.refresh()
