@@ -591,7 +591,6 @@ class OnboardPanel(QWidget):
 
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
-        self.lbl_desc.setText(i18n.t("onboard_desc"))
         self.btn_webui_link.setText(i18n.t("onboard_btn_open_webui"))
         self.btn_docs.setText(i18n.t("onboard_btn_open_docs"))
         self.btn_wiki.setText(i18n.t("onboard_btn_wiki"))

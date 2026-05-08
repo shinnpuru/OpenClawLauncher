@@ -202,6 +202,7 @@
     "col_plugin_source": "来源",
     "col_plugin_name": "插件",
     "col_plugin_action": "操作",
+    "col_plugin_version": "版本",
     "status_not_found": "目录不存在",
     "status_empty": "空",
     "msg_plugin_name_required": "请输入插件包名",

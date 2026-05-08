@@ -201,6 +201,7 @@
     "col_plugin_source": "Source",
     "col_plugin_name": "Plugin",
     "col_plugin_action": "Action",
+    "col_plugin_version": "Version",
     "status_not_found": "Directory not found",
     "status_empty": "Empty",
     "msg_plugin_name_required": "Please enter a plugin package name",
