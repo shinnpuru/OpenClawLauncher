@@ -7,15 +7,17 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
 )
-from PySide6.QtCore import QThread, Signal, QTimer
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QThread, Signal, QTimer, Qt
+from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtCore import QUrl
+from pathlib import Path
 
 from ...core.config import Config
 from ...core.install_manager import InstallManager
 from ...core.process_manager import ProcessManager
 from ...core.runtime_manager import RuntimeManager
 from ..i18n import i18n
+from datetime import datetime
 
 
 class InstallDependenciesWorker(QThread):
@@ -31,6 +33,24 @@ class InstallDependenciesWorker(QThread):
         try:
             manager = RuntimeManager()
 
+            # ensure logs dir exists and open installer log
+            try:
+                Config.ensure_dirs()
+                log_path = Config.get_log_file("installer")
+                log_f = open(log_path, "a", encoding="utf-8")
+            except Exception:
+                log_f = None
+
+            def _write_log(msg: str):
+                if not msg:
+                    return
+                try:
+                    if log_f:
+                        log_f.write(f"{datetime.now().isoformat()} {msg}\n")
+                        log_f.flush()
+                except Exception:
+                    pass
+
             # Node.js runtime
             if not manager.get_default_version(RuntimeManager.SOFTWARE_NODE):
                 node_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_NODE)
@@ -38,7 +58,9 @@ class InstallDependenciesWorker(QThread):
                     raise RuntimeError("No available Node.js versions")
 
                 node_target = str(node_versions[0]["version"])
-                self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_node"), version=node_target))
+                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_node"), version=node_target)
+                self.progress.emit(msg)
+                _write_log(msg)
                 self.progress_percentage.emit(25)
                 manager.install_version(RuntimeManager.SOFTWARE_NODE, node_target)
                 self.progress_percentage.emit(50)
@@ -46,7 +68,9 @@ class InstallDependenciesWorker(QThread):
 
             # OpenClaw runtime
             if not manager.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW):
-                self.progress.emit(i18n.t("onboard_status_refresh_openclaw"))
+                msg = i18n.t("onboard_status_refresh_openclaw")
+                self.progress.emit(msg)
+                _write_log(msg)
                 self.progress_percentage.emit(60)
                 manager.refresh_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
                 openclaw_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
@@ -54,16 +78,31 @@ class InstallDependenciesWorker(QThread):
                     raise RuntimeError("No available OpenClaw versions")
 
                 openclaw_target = str(openclaw_versions[0]["version"])
-                self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=openclaw_target))
+                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=openclaw_target)
+                self.progress.emit(msg)
+                _write_log(msg)
                 self.progress_percentage.emit(80)
                 manager.install_version(RuntimeManager.SOFTWARE_OPENCLAW, openclaw_target)
                 self.progress_percentage.emit(95)
                 manager.set_default_version(RuntimeManager.SOFTWARE_OPENCLAW, openclaw_target)
 
             self.progress_percentage.emit(100)
+            msg = i18n.t("onboard_msg_dependencies_done")
+            _write_log(msg)
             self.completed.emit()
         except Exception as e:
+            # log error to installer log as well
+            try:
+                _write_log(f"Error: {str(e)}")
+            except Exception:
+                pass
             self.error.emit(str(e))
+        finally:
+            try:
+                if 'log_f' in locals() and log_f:
+                    log_f.close()
+            except Exception:
+                pass
 
 
 class CreateSampleWorker(QThread):
@@ -86,6 +125,102 @@ class CreateSampleWorker(QThread):
             self.error.emit(str(e))
 
 
+class OneClickWorker(QThread):
+    """Performs the full one-click flow: install runtimes, create sample, start instance."""
+    completed = Signal()
+    error = Signal(str)
+    progress = Signal(str)
+    progress_percentage = Signal(int)
+
+    def __init__(self, instance_name: str, instance_port: int):
+        super().__init__()
+        self.instance_name = instance_name
+        self.instance_port = instance_port
+
+    def run(self):
+        try:
+            manager = RuntimeManager()
+
+            def _write_log(msg: str):
+                try:
+                    Config.ensure_dirs()
+                    log_path = Config.get_log_file("installer")
+                    with open(log_path, "a", encoding="utf-8") as log_f:
+                        if msg:
+                            log_f.write(f"{datetime.now().isoformat()} {msg}\n")
+                            log_f.flush()
+                except Exception:
+                    pass
+
+            # Step: ensure Node.js
+            if self.isInterruptionRequested():
+                raise RuntimeError("Interrupted")
+
+            if not manager.get_default_version(RuntimeManager.SOFTWARE_NODE):
+                node_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_NODE)
+                if not node_versions:
+                    raise RuntimeError("No available Node.js versions")
+
+                node_target = str(node_versions[0]["version"])
+                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_node"), version=node_target)
+                self.progress.emit(msg)
+                _write_log(msg)
+                self.progress_percentage.emit(20)
+                manager.install_version(RuntimeManager.SOFTWARE_NODE, node_target)
+                self.progress_percentage.emit(40)
+                manager.set_default_version(RuntimeManager.SOFTWARE_NODE, node_target)
+
+            if self.isInterruptionRequested():
+                raise RuntimeError("Interrupted")
+
+            # Step: ensure OpenClaw runtime
+            if not manager.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW):
+                msg = i18n.t("onboard_status_refresh_openclaw")
+                self.progress.emit(msg)
+                _write_log(msg)
+                self.progress_percentage.emit(50)
+                manager.refresh_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
+                openclaw_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
+                if not openclaw_versions:
+                    raise RuntimeError("No available OpenClaw versions")
+
+                openclaw_target = str(openclaw_versions[0]["version"])
+                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=openclaw_target)
+                self.progress.emit(msg)
+                _write_log(msg)
+                self.progress_percentage.emit(70)
+                manager.install_version(RuntimeManager.SOFTWARE_OPENCLAW, openclaw_target)
+                self.progress_percentage.emit(85)
+                manager.set_default_version(RuntimeManager.SOFTWARE_OPENCLAW, openclaw_target)
+
+            if self.isInterruptionRequested():
+                raise RuntimeError("Interrupted")
+
+            # Create sample
+            self.progress.emit(i18n.t("onboard_status_creating_sample", name=self.instance_name))
+            _write_log(i18n.t("onboard_status_creating_sample", name=self.instance_name))
+            self.progress_percentage.emit(90)
+            InstallManager.complete_install(self.instance_name, self.instance_port)
+            self.progress_percentage.emit(95)
+
+            if self.isInterruptionRequested():
+                raise RuntimeError("Interrupted")
+
+            # Start instance
+            self.progress.emit(i18n.t("onboard_status_starting_instance", name=self.instance_name))
+            _write_log(i18n.t("onboard_status_starting_instance", name=self.instance_name))
+            ProcessManager.start_instance(self.instance_name, Config.get_instance_path(self.instance_name))
+            self.progress_percentage.emit(100)
+
+            self.completed.emit()
+        except Exception as e:
+            try:
+                _write_log(f"Error: {str(e)}")
+            except Exception:
+                pass
+            self.error.emit(str(e))
+
+
 class OnboardPanel(QWidget):
     dependencies_ready = Signal()
     sample_ready = Signal()
@@ -99,131 +234,84 @@ class OnboardPanel(QWidget):
         self.dep_worker = None
         self.sample_worker = None
 
+        worker = getattr(self, "one_click_worker", None)
+        if worker and worker.isRunning():
+            try:
+                worker.requestInterruption()
+                worker.wait(1000)
+                if worker.isRunning():
+                    worker.terminate()
+                    worker.wait(500)
+            except Exception:
+                pass
+        self.one_click_worker = None
+
+        # Ensure sample instance stopped on shutdown
+        try:
+            if self._sample_running():
+                ProcessManager.stop_instance(self.SAMPLE_INSTANCE_NAME)
+        except Exception:
+            pass
+        self.one_click_worker = None
+
         self.layout = QVBoxLayout(self)
 
         self.lbl_title = QLabel(i18n.t("onboard_title"))
         self.lbl_title.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.layout.addWidget(self.lbl_title)
 
-        self.lbl_desc = QLabel(i18n.t("onboard_desc"))
-        self.lbl_desc.setWordWrap(True)
-        self.layout.addWidget(self.lbl_desc)
+        # Logo above the primary action
+        self.lbl_logo = QLabel()
+        logo_path = Path(__file__).resolve().parents[4] / "logo.png"
+        if logo_path.exists():
+            logo_pixmap = QPixmap(str(logo_path))
+            if not logo_pixmap.isNull():
+                self.lbl_logo.setPixmap(logo_pixmap.scaledToWidth(180))
+                self.lbl_logo.setAlignment(Qt.AlignCenter)
+        self.layout.addWidget(self.lbl_logo)
 
-        # Wiki / docs (top)
-        self.btn_wiki = QPushButton(i18n.t("onboard_btn_wiki"))
-        self.btn_wiki.clicked.connect(lambda: self.open_url("https://github.com/shinnpuru/OpenClawLauncher"))
-        self.layout.addWidget(self.btn_wiki)
+        self.layout.addStretch()
 
-        self.layout.addSpacing(12)
+        # Main unified progress (used by one-click flow)
+        self.progress_main = QProgressBar()
+        self.progress_main.setVisible(False)
+        self.progress_main.setMaximum(100)
+        self.layout.addWidget(self.progress_main)
 
-        # Step 1: dependencies
-        self.step_dep_widget = QWidget()
-        self.step_dep_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        dep_layout = QHBoxLayout(self.step_dep_widget)
-        dep_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_dep = QLabel(i18n.t("onboard_step_dependencies"))
-        dep_layout.addWidget(self.lbl_step_dep)
-        dep_layout.addStretch()
-        self.lbl_dep_status = QLabel("")
-        dep_layout.addWidget(self.lbl_dep_status)
-        self.btn_install_deps = QPushButton(i18n.t("onboard_btn_install_dependencies"))
-        self.btn_install_deps.clicked.connect(self.install_dependencies)
-        dep_layout.addWidget(self.btn_install_deps)
-        self.layout.addWidget(self.step_dep_widget)
-
-        # Step 1 Progress Bar
+        # Hidden legacy progress bars kept for worker callbacks
         self.progress_dep = QProgressBar()
         self.progress_dep.setVisible(False)
         self.progress_dep.setMaximum(100)
-        self.layout.addWidget(self.progress_dep)
 
-        # Step 2: sample instance
-        self.step_sample_widget = QWidget()
-        self.step_sample_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        sample_layout = QHBoxLayout(self.step_sample_widget)
-        sample_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_sample = QLabel(i18n.t("onboard_step_sample"))
-        sample_layout.addWidget(self.lbl_step_sample)
-        sample_layout.addStretch()
-        self.lbl_sample_status = QLabel("")
-        sample_layout.addWidget(self.lbl_sample_status)
-        self.btn_create_sample = QPushButton(i18n.t("onboard_btn_create_sample"))
-        self.btn_create_sample.clicked.connect(self.create_sample)
-        sample_layout.addWidget(self.btn_create_sample)
-        self.layout.addWidget(self.step_sample_widget)
-
-        # Step 2 Progress Bar
         self.progress_sample = QProgressBar()
         self.progress_sample.setVisible(False)
         self.progress_sample.setMaximum(100)
-        self.layout.addWidget(self.progress_sample)
-
-        # Step 3: configure LlamaCPP / model
-        self.step_model_widget = QWidget()
-        self.step_model_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        model_layout = QHBoxLayout(self.step_model_widget)
-        model_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_model = QLabel(i18n.t("onboard_step_model"))
-        self.lbl_step_model.setStyleSheet("font-size: 15px; font-weight: 600;")
-        model_layout.addWidget(self.lbl_step_model)
-        model_layout.addStretch()
-        self.btn_open_llamacpp = QPushButton(i18n.t("onboard_btn_config_llamacpp"))
-        self.btn_open_llamacpp.clicked.connect(self.open_llamacpp_tab)
-        model_layout.addWidget(self.btn_open_llamacpp)
-        self.btn_open_model_switch = QPushButton(i18n.t("onboard_btn_config_model"))
-        self.btn_open_model_switch.clicked.connect(self.open_model_switch_tab)
-        model_layout.addWidget(self.btn_open_model_switch)
-        self.layout.addWidget(self.step_model_widget)
-
-        # Step 4: configure channels
-        self.step_channel_widget = QWidget()
-        self.step_channel_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        channel_layout = QHBoxLayout(self.step_channel_widget)
-        channel_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_channel = QLabel(i18n.t("onboard_step_channels"))
-        self.lbl_step_channel.setStyleSheet("font-size: 15px; font-weight: 600;")
-        channel_layout.addWidget(self.lbl_step_channel)
-        channel_layout.addStretch()
-        self.btn_open_channel_config = QPushButton(i18n.t("onboard_btn_config_channels"))
-        self.btn_open_channel_config.clicked.connect(self.open_channel_config_tab)
-        channel_layout.addWidget(self.btn_open_channel_config)
-        self.layout.addWidget(self.step_channel_widget)
-
-        # Step 5: start sample instance
-        self.step_start_widget = QWidget()
-        self.step_start_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        start_layout = QHBoxLayout(self.step_start_widget)
-        start_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_start = QLabel(i18n.t("onboard_step_start_instance"))
-        start_layout.addWidget(self.lbl_step_start)
-        start_layout.addStretch()
-        self.lbl_start_status = QLabel("")
-        start_layout.addWidget(self.lbl_start_status)
-        self.btn_start_sample = QPushButton(i18n.t("onboard_btn_start_instance"))
-        self.btn_start_sample.clicked.connect(self.start_sample_instance)
-        start_layout.addWidget(self.btn_start_sample)
-        self.layout.addWidget(self.step_start_widget)
-
-        # Step 6: open WebUI
-        self.step_webui_widget = QWidget()
-        self.step_webui_widget.setStyleSheet("border: 1px solid #d9d9d9; border-radius: 8px;")
-        webui_layout = QHBoxLayout(self.step_webui_widget)
-        webui_layout.setContentsMargins(10, 8, 10, 8)
-        self.lbl_step_webui = QLabel(i18n.t("onboard_step_open_webui"))
-        self.lbl_step_webui.setStyleSheet("font-size: 15px; font-weight: 600;")
-        webui_layout.addWidget(self.lbl_step_webui)
-        webui_layout.addStretch()
-        self.btn_open_webui = QPushButton(i18n.t("onboard_btn_open_webui"))
-        self.btn_open_webui.clicked.connect(self.open_sample_webui)
-        webui_layout.addWidget(self.btn_open_webui)
-        self.layout.addWidget(self.step_webui_widget)
 
         self.layout.addSpacing(8)
 
         self.lbl_status = QLabel(i18n.t("status_ready"))
         self.layout.addWidget(self.lbl_status)
 
-        self.layout.addStretch()
+        self.layout.addSpacing(10)
+
+        # One-click install / start / stop button (single control for onboarding)
+        self.btn_one_click = QPushButton(i18n.t("onboard_btn_install_dependencies"))
+        self.btn_one_click.clicked.connect(self.one_click_action)
+        self.layout.addWidget(self.btn_one_click)
+
+        # Quick links under the start panel
+        links_layout = QHBoxLayout()
+        self.btn_webui_link = QPushButton(i18n.t("onboard_btn_open_webui"))
+        self.btn_webui_link.clicked.connect(self.open_sample_webui)
+        self.btn_docs = QPushButton(i18n.t("onboard_btn_open_docs"))
+        self.btn_docs.clicked.connect(lambda: self.open_url("https://docs.openclaw.ai"))
+        self.btn_wiki = QPushButton(i18n.t("onboard_btn_wiki"))
+        self.btn_wiki.clicked.connect(lambda: self.open_url("https://github.com/shinnpuru/OpenClawLauncher/wiki"))
+
+        links_layout.addWidget(self.btn_webui_link)
+        links_layout.addWidget(self.btn_docs)
+        links_layout.addWidget(self.btn_wiki)
+        self.layout.addLayout(links_layout)
 
         self.layout.addSpacing(10)
 
@@ -266,80 +354,45 @@ class OnboardPanel(QWidget):
             return False
         return ProcessManager.get_status(self.SAMPLE_INSTANCE_NAME) == "Running"
 
-    def _apply_step_style(self, title_label: QLabel, status_label: QLabel, completed: bool):
-        if completed:
-            title_label.setStyleSheet("color: gray; font-size: 15px; font-weight: 600;")
-            status_label.setStyleSheet("color: gray; font-size: 14px;")
-        else:
-            title_label.setStyleSheet("font-size: 15px; font-weight: 600;")
-            status_label.setStyleSheet("font-size: 14px;")
-
     def refresh_status(self):
         deps_done = self._dependencies_ok()
         sample_done = self._sample_ok()
         running_done = self._sample_running()
-        dep_task_running = bool(self.dep_worker and self.dep_worker.isRunning())
-        sample_task_running = bool(self.sample_worker and self.sample_worker.isRunning())
 
-        self.lbl_dep_status.setText(
-            i18n.t("onboard_btn_installing")
-            if dep_task_running
-            else (i18n.t("onboard_step_done") if deps_done else i18n.t("onboard_step_pending"))
-        )
-        self.lbl_sample_status.setText(
-            i18n.t("onboard_btn_creating")
-            if sample_task_running
-            else (i18n.t("onboard_step_done") if sample_done else i18n.t("onboard_step_pending"))
-        )
-        self.lbl_start_status.setText(i18n.t("onboard_step_done") if running_done else i18n.t("onboard_step_pending"))
-
-        self._apply_step_style(self.lbl_step_dep, self.lbl_dep_status, deps_done)
-        self._apply_step_style(self.lbl_step_sample, self.lbl_sample_status, sample_done)
-        self._apply_step_style(self.lbl_step_start, self.lbl_start_status, running_done)
-
-        if self.dep_worker and self.dep_worker.isRunning():
-            self.btn_install_deps.setEnabled(False)
-            self.btn_install_deps.setText(i18n.t("onboard_btn_installing"))
+        if self.one_click_worker and self.one_click_worker.isRunning():
+            self.btn_one_click.setEnabled(True)
+            self.btn_one_click.setText(i18n.t("onboard_btn_installing") or "停止")
+        elif running_done:
+            self.btn_one_click.setEnabled(True)
+            self.btn_one_click.setText(i18n.t("onboard_btn_stop_instance") or "停止 OpenClaw")
+        elif not deps_done or not sample_done:
+            self.btn_one_click.setEnabled(True)
+            self.btn_one_click.setText("一键安装并启动 OpenClaw")
         else:
-            self.btn_install_deps.setEnabled(not deps_done)
-            self.btn_install_deps.setText(i18n.t("onboard_btn_install_dependencies") if not deps_done else i18n.t("onboard_done"))
+            self.btn_one_click.setEnabled(True)
+            self.btn_one_click.setText(i18n.t("onboard_btn_start_instance") or "启动 OpenClaw")
 
-        if self.sample_worker and self.sample_worker.isRunning():
-            self.btn_create_sample.setEnabled(False)
-            self.btn_create_sample.setText(i18n.t("onboard_btn_creating"))
-        else:
-            self.btn_create_sample.setEnabled((not sample_done) and deps_done)
-            self.btn_create_sample.setText(i18n.t("onboard_btn_create_sample") if not sample_done else i18n.t("onboard_done"))
-
-        self.btn_start_sample.setEnabled(sample_done and (not running_done))
-        self.btn_start_sample.setText(i18n.t("onboard_btn_start_instance") if not running_done else i18n.t("onboard_done"))
-
-        self.btn_open_llamacpp.setEnabled(sample_done)
-        self.btn_open_model_switch.setEnabled(sample_done)
-        self.btn_open_channel_config.setEnabled(sample_done)
-        self.btn_open_webui.setEnabled(running_done)
-
-        if dep_task_running:
-            # 依赖安装期间可能会有更细粒度进度文案，通过 on_dep_progress 更新，这里不覆盖。
-            pass
-        elif sample_task_running:
+        if self.one_click_worker and self.one_click_worker.isRunning():
             self.lbl_status.setText(i18n.t("onboard_status_creating_sample", name=self.SAMPLE_INSTANCE_NAME))
-        elif deps_done and sample_done and running_done:
+        elif running_done:
             self.lbl_status.setText(i18n.t("onboard_all_done"))
         elif not deps_done:
-            self.lbl_status.setText(i18n.t("onboard_hint_install_dependencies"))
+            self.lbl_status.setText("")
         elif not sample_done:
             self.lbl_status.setText(i18n.t("onboard_hint_create_sample"))
-        elif not running_done:
-            self.lbl_status.setText(i18n.t("onboard_hint_configure_before_start"))
         else:
-            self.lbl_status.setText(i18n.t("onboard_hint_start_instance"))
+            self.lbl_status.setText(i18n.t("onboard_hint_configure_before_start"))
 
     def install_dependencies(self):
         if self.dep_worker and self.dep_worker.isRunning():
             return
-
         self.dep_worker = InstallDependenciesWorker()
+        # Ensure Qt ownership and automatic safe deletion when finished
+        try:
+            self.dep_worker.setParent(self)
+            self.dep_worker.finished.connect(self.dep_worker.deleteLater)
+        except Exception:
+            pass
         self.dep_worker.progress.connect(self.on_dep_progress)
         self.dep_worker.progress_percentage.connect(self.on_dep_progress_percentage)
         self.dep_worker.completed.connect(self.on_dep_finished)
@@ -347,6 +400,65 @@ class OnboardPanel(QWidget):
         self.dep_worker.start()
         self.progress_dep.setVisible(True)
         self.progress_dep.setValue(0)
+        self.refresh_status()
+
+    def one_click_action(self):
+        # 如果 worker 在运行，发出中断请求
+        if self.one_click_worker and self.one_click_worker.isRunning():
+            try:
+                self.one_click_worker.requestInterruption()
+            except Exception:
+                pass
+            return
+
+        # 如果样例已经运行，停止实例
+        if self._sample_running():
+            try:
+                ProcessManager.stop_instance(self.SAMPLE_INSTANCE_NAME)
+                QMessageBox.information(self, i18n.t("title_success"), i18n.t("onboard_msg_instance_stopped", name=self.SAMPLE_INSTANCE_NAME))
+            except Exception as e:
+                QMessageBox.critical(self, i18n.t("title_error"), str(e))
+            self.refresh_status()
+            return
+
+        # 依赖和样例都已就绪时，直接启动实例
+        if self._dependencies_ok() and self._sample_ok():
+            self.start_sample_instance()
+            return
+
+        # 启动一键流程
+        if not self._dependencies_ok() or not self._sample_ok():
+            self.one_click_worker = OneClickWorker(self.SAMPLE_INSTANCE_NAME, self.SAMPLE_INSTANCE_PORT)
+            try:
+                self.one_click_worker.setParent(self)
+                self.one_click_worker.finished.connect(self.one_click_worker.deleteLater)
+            except Exception:
+                pass
+            self.one_click_worker.progress.connect(self.on_one_click_progress)
+            self.one_click_worker.progress_percentage.connect(self.on_one_click_progress_percentage)
+            self.one_click_worker.completed.connect(self.on_one_click_finished)
+            self.one_click_worker.error.connect(self.on_one_click_error)
+            self.one_click_worker.start()
+            self.progress_main.setVisible(True)
+            self.progress_main.setValue(0)
+            self.refresh_status()
+
+    def on_one_click_progress(self, message: str):
+        self.lbl_status.setText(message)
+
+    def on_one_click_progress_percentage(self, percentage: int):
+        self.progress_main.setValue(percentage)
+
+    def on_one_click_finished(self):
+        self.one_click_worker = None
+        self.progress_main.setVisible(False)
+        QMessageBox.information(self, i18n.t("title_success"), i18n.t("onboard_all_done"))
+        self.refresh_status()
+
+    def on_one_click_error(self, error: str):
+        self.one_click_worker = None
+        self.progress_main.setVisible(False)
+        QMessageBox.critical(self, i18n.t("title_error"), i18n.t("onboard_msg_dependencies_failed", error=error))
         self.refresh_status()
 
     def on_dep_progress(self, message: str):
@@ -381,6 +493,13 @@ class OnboardPanel(QWidget):
             return
 
         self.sample_worker = CreateSampleWorker(self.SAMPLE_INSTANCE_NAME, self.SAMPLE_INSTANCE_PORT)
+        # Ensure Qt ownership and automatic safe deletion when finished
+        try:
+            self.sample_worker.setParent(self)
+            self.sample_worker.finished.connect(self.sample_worker.deleteLater)
+        except Exception:
+            pass
+
         self.sample_worker.progress_percentage.connect(self.on_sample_progress_percentage)
         self.sample_worker.completed.connect(self.on_sample_finished)
         self.sample_worker.error.connect(self.on_sample_error)
@@ -463,21 +582,10 @@ class OnboardPanel(QWidget):
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.lbl_desc.setText(i18n.t("onboard_desc"))
-        self.lbl_step_dep.setText(i18n.t("onboard_step_dependencies"))
-        self.lbl_step_sample.setText(i18n.t("onboard_step_sample"))
-        self.lbl_step_model.setText(i18n.t("onboard_step_model"))
-        self.lbl_step_channel.setText(i18n.t("onboard_step_channels"))
-        self.lbl_step_start.setText(i18n.t("onboard_step_start_instance"))
-        self.lbl_step_webui.setText(i18n.t("onboard_step_open_webui"))
-        self.btn_open_llamacpp.setText(i18n.t("onboard_btn_config_llamacpp"))
-        self.btn_open_model_switch.setText(i18n.t("onboard_btn_config_model"))
-        self.btn_open_channel_config.setText(i18n.t("onboard_btn_config_channels"))
-        self.btn_open_webui.setText(i18n.t("onboard_btn_open_webui"))
+        self.btn_webui_link.setText(i18n.t("onboard_btn_open_webui"))
+        self.btn_docs.setText(i18n.t("onboard_btn_open_docs"))
         self.btn_wiki.setText(i18n.t("onboard_btn_wiki"))
-        self.lbl_support.setText(i18n.t("onboard_support_title"))
-        self.btn_afdian.setText(i18n.t("onboard_btn_afdian"))
-        self.btn_bilibili.setText(i18n.t("onboard_btn_bilibili"))
-        self.btn_kofi.setText(i18n.t("onboard_btn_kofi"))
+        self.btn_one_click.setText(self.btn_one_click.text())
         self.refresh_status()
 
     def shutdown(self):

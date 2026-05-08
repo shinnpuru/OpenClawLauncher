@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         self._is_shutting_down = False
         self._update_check_worker = None
         self.setWindowTitle("OpenClaw Launcher")
-        self.resize(1200, 700)
+        self.resize(900, 600)
         self._sidebar_width = 200
         self._sidebar_collapsed = False
         
