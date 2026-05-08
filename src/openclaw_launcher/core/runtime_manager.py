@@ -536,49 +536,14 @@ class RuntimeManager:
 
     def _extract_archive(self, archive_path: Path, dest_dir: Path):
         logger.info(f"Extracting {archive_path} to {dest_dir}")
-        archive_name = archive_path.name.lower()
-        is_openclaw_archive = archive_name.startswith("openclaw-")
-
-        def _is_ignored_artifact(name: str) -> bool:
-            return name.startswith("._") or name in {".ds_store", "__macosx", ".appledouble"}
-
-        def _safe_target_path(relative_name: str) -> Path:
-            target_path = dest_dir / relative_name
-            resolved_target = target_path.resolve(strict=False)
-            resolved_dest = dest_dir.resolve(strict=False)
-            if resolved_target != resolved_dest and resolved_dest not in resolved_target.parents:
-                raise RuntimeError(f"Unsafe archive member path: {relative_name}")
-            return target_path
-
-        def _strip_openclaw_prefix(member_name: str) -> Optional[str]:
-            normalized = member_name.replace("\\", "/").lstrip("/")
-            if not normalized:
-                return None
-
-            if is_openclaw_archive:
-                if normalized == "package":
-                    return None
-                if normalized.startswith("package/"):
-                    stripped = normalized[len("package/"):]
-                    return stripped or None
-                return None
-
-            return normalized
-
         if str(archive_path).endswith("tar.gz") or str(archive_path).endswith("tgz"):
             with tarfile.open(archive_path, "r:gz") as tar:
-                for member in tar.getmembers():
-                    if member.isdir() or member.issym() or member.islnk() or member.isfile():
-                        target_name = _strip_openclaw_prefix(member.name)
-                        if not target_name or _is_ignored_artifact(Path(target_name).name):
-                            continue
-                        member.name = target_name
-                        target_path = _safe_target_path(target_name)
-                        target_path.parent.mkdir(parents=True, exist_ok=True)
-                        tar.extract(member, path=dest_dir)
+                tar.extractall(path=dest_dir)
         elif str(archive_path).endswith("zip"):
             with zipfile.ZipFile(archive_path, 'r') as zip_ref:
                 zip_ref.extractall(dest_dir)
+        else:
+            raise ValueError(f"Unsupported archive format: {archive_path}")
 
     def install_version(self, software: str, version: str, callback=None):
         target_dir = self.RUNTIME_BASE_DIR / f"{software}-{version}"
@@ -624,10 +589,9 @@ class RuntimeManager:
                     if not tarball_path.exists():
                         raise RuntimeError(f"npm pack did not create expected tarball: {tarball_name}")
 
-                    self._emit_progress(callback, "extract", 0, None, f"Extracting {tarball_name}")
-                    self._extract_archive(tarball_path, target_dir)
-                    self._emit_progress(callback, "extract", 1, 1, f"Extracted {tarball_name}")
-                    tarball_path.unlink()
+                    final_tarball = target_dir / tarball_name
+                    shutil.move(str(tarball_path), str(final_tarball))
+                    self._emit_progress(callback, "extract", 1, 1, f"Downloaded {tarball_name}")
                 except subprocess.CalledProcessError as e:
                     raise RuntimeError(f"npm pack failed: {e.stderr}") from e
             else:

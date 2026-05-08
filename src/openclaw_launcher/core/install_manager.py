@@ -6,6 +6,7 @@ import logging
 import json
 import re
 import secrets
+import tarfile
 from pathlib import Path
 from typing import Optional, TextIO, Callable
 from .config import Config
@@ -819,6 +820,46 @@ store-dir=../../.pnpm-store
         config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     @classmethod
+    def _extract_openclaw_archive(cls, archive_path: Path, dest_dir: Path):
+        logger.info(f"Extracting {archive_path} to {dest_dir}")
+        if not archive_path.exists():
+            raise FileNotFoundError(f"OpenClaw archive not found: {archive_path}")
+
+        def _is_ignored_artifact(name: str) -> bool:
+            return name.startswith("._") or name in {".ds_store", "__macosx", ".appledouble"}
+
+        def _safe_target_path(relative_name: str) -> Path:
+            target_path = dest_dir / relative_name
+            resolved_target = target_path.resolve(strict=False)
+            resolved_dest = dest_dir.resolve(strict=False)
+            if resolved_target != resolved_dest and resolved_dest not in resolved_target.parents:
+                raise RuntimeError(f"Unsafe archive member path: {relative_name}")
+            return target_path
+
+        def _strip_openclaw_prefix(member_name: str) -> Optional[str]:
+            normalized = member_name.replace("\\", "/").lstrip("/")
+            if not normalized:
+                return None
+                
+            if normalized == "package":
+                return None
+            if normalized.startswith("package/"):
+                stripped = normalized[len("package/"):]
+                return stripped or None
+            return None
+
+        with tarfile.open(archive_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if member.isdir() or member.issym() or member.islnk() or member.isfile():
+                    target_name = _strip_openclaw_prefix(member.name)
+                    if not target_name or _is_ignored_artifact(Path(target_name).name):
+                        continue
+                    member.name = target_name
+                    target_path = _safe_target_path(target_name)
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    tar.extract(member, path=dest_dir)
+
+    @classmethod
     def complete_install(
         cls,
         instance_name: str,
@@ -846,7 +887,12 @@ store-dir=../../.pnpm-store
 
         logger.info(f"Creating instance {instance_name} from {source_path}")
         
-        shutil.copytree(source_path, target_path, symlinks=True)
+        target_path.mkdir(parents=True, exist_ok=True)
+        archive_path = source_path / (source_path.name + ".tgz")
+        if archive_path.exists():
+            cls._extract_openclaw_archive(archive_path, target_path)
+        else:
+            raise RuntimeError(f"Archive Path not found: {archive_path}")
         
         log_file_path = Config.get_log_file(instance_name)
         log_file = open(log_file_path, "a", encoding="utf-8")
@@ -971,8 +1017,12 @@ store-dir=../../.pnpm-store
             # Report progress: overwriting files
             cls._report_progress(progress_callback, "overwriting", 0, 0, "")
             
-            # Merge source files into current instance, overwriting everything except user data
-            cls._merge_directory(source_path, current_path, ignore_dir_names=set())
+            archive_path = source_path / (source_path.name + ".tgz")
+            if archive_path.exists():
+                cls._extract_openclaw_archive(archive_path, current_path)
+            else:
+                raise RuntimeError(f"Archive Path not found: {archive_path}")
+                
             log_file.write("File overwriting completed.\n")
             log_file.flush()
             logger.info(f"Overwritten files in {instance_name} from {source_path}")
