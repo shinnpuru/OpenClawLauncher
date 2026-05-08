@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="teaser.png" alt="OpenClaw Launcher Logo" />
+	<img src="teaser.png" alt="OpenClaw Launcher Logo" width="200"/>
 </p>
 
 <h1 align="center">OpenClaw Launcher</h1>
