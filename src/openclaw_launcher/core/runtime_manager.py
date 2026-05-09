@@ -419,18 +419,10 @@ class RuntimeManager:
         runtime_root = node_bin_dir.parent
 
         # Look for npm in runtime
-        candidates = []
-        if platform.system() == "Windows":
-            candidates = [
-                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
-                node_bin_dir / "npm.cmd",
-                node_bin_dir / "npm.exe",
-            ]
-        else:
-            candidates = [
-                runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
-                node_bin_dir / "npm",
-            ]
+        candidates = [
+            node_bin_dir / "node_modules" / "npm" / "bin" / "npm-cli.js",
+            runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
+        ]
 
         for candidate in candidates:
             if candidate.exists() and candidate.is_file():
