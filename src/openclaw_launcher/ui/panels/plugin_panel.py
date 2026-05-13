@@ -212,6 +212,10 @@ class PluginPanel(QWidget):
             "name": "@tencent-weixin/openclaw-weixin",
             "url": "https://github.com/Tencent/openclaw-weixin",
         },
+        {
+            "name": "@xquik/tweetclaw",
+            "url": "https://github.com/Xquik-dev/tweetclaw",
+        },
     ]
 
     def __init__(self):
