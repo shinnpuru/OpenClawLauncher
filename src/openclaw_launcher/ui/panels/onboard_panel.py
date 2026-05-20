@@ -18,6 +18,7 @@ from ...core.process_manager import ProcessManager
 from ...core.runtime_manager import RuntimeManager
 from ..i18n import i18n
 from datetime import datetime
+from pathlib import Path
 
 
 def _resolve_logo_path() -> str | None:
@@ -329,12 +330,15 @@ class OnboardPanel(QWidget):
         links_layout = QHBoxLayout()
         self.btn_webui_link = QPushButton(i18n.t("onboard_btn_open_webui"))
         self.btn_webui_link.clicked.connect(self.open_sample_webui)
+        self.btn_cli_launcher = QPushButton(i18n.t("onboard_btn_open_cli"))
+        self.btn_cli_launcher.clicked.connect(self.open_sample_cli)
         self.btn_docs = QPushButton(i18n.t("onboard_btn_open_docs"))
         self.btn_docs.clicked.connect(lambda: self.open_url("https://docs.openclaw.ai"))
         self.btn_wiki = QPushButton(i18n.t("onboard_btn_wiki"))
         self.btn_wiki.clicked.connect(lambda: self.open_url("https://github.com/shinnpuru/OpenClawLauncher/wiki"))
 
         links_layout.addWidget(self.btn_webui_link)
+        links_layout.addWidget(self.btn_cli_launcher)
         links_layout.addWidget(self.btn_docs)
         links_layout.addWidget(self.btn_wiki)
         self.layout.addLayout(links_layout)
@@ -601,12 +605,26 @@ class OnboardPanel(QWidget):
         QDesktopServices.openUrl(url)
         self.lbl_status.setText(i18n.t("onboard_msg_webui_opened", url=url.toString()))
 
+    def open_sample_cli(self):
+        if not self._sample_ok():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_not_found"))
+            self.refresh_status()
+            return
+
+        try:
+            instance_path = Config.get_instance_path(self.SAMPLE_INSTANCE_NAME)
+            ProcessManager.launch_instance_cli(self.SAMPLE_INSTANCE_NAME, instance_path)
+            self.lbl_status.setText(i18n.t("onboard_msg_cli_opened", name=self.SAMPLE_INSTANCE_NAME))
+        except Exception as e:
+            QMessageBox.critical(self, i18n.t("title_error"), i18n.t("onboard_msg_cli_open_failed", error=str(e)))
+
     def open_url(self, url: str):
         QDesktopServices.openUrl(QUrl(url))
 
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.btn_webui_link.setText(i18n.t("onboard_btn_open_webui"))
+        self.btn_cli_launcher.setText(i18n.t("onboard_btn_open_cli"))
         self.btn_docs.setText(i18n.t("onboard_btn_open_docs"))
         self.btn_wiki.setText(i18n.t("onboard_btn_wiki"))
         self.btn_one_click.setText(self.btn_one_click.text())

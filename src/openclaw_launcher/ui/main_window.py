@@ -208,7 +208,6 @@ class MainWindow(QMainWindow):
                 (i18n.t("tab_model_switch"), "model_switch"),
             ],
             i18n.t("sidebar_section_data"): [
-                (i18n.t("tab_instances"), "instances"),
                 (i18n.t("tab_instance_env"), "env_vars"),
                 (i18n.t("tab_dependencies"), "dependencies"),
                 (i18n.t("tab_backups"), "backups"),
