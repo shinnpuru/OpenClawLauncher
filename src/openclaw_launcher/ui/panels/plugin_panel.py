@@ -207,14 +207,17 @@ class PluginPanel(QWidget):
         {
             "name": "@dingtalk-real-ai/dingtalk-connector",
             "url": "https://github.com/DingTalk-Real-AI/dingtalk-openclaw-connector",
+            "description_key": "desc_plugin_dingtalk",
         },
         {
             "name": "@tencent-weixin/openclaw-weixin",
             "url": "https://github.com/Tencent/openclaw-weixin",
+            "description_key": "desc_plugin_weixin",
         },
         {
             "name": "@xquik/tweetclaw",
             "url": "https://github.com/Xquik-dev/tweetclaw",
+            "description_key": "desc_plugin_tweetclaw",
         },
     ]
 
@@ -292,8 +295,19 @@ class PluginPanel(QWidget):
             row_layout = QHBoxLayout(row_widget)
             row_layout.setContentsMargins(0, 0, 0, 0)
 
+            text_widget = QWidget()
+            text_layout = QVBoxLayout(text_widget)
+            text_layout.setContentsMargins(0, 0, 0, 0)
+            text_layout.setSpacing(2)
+
             label = QLabel(plugin["name"])
-            row_layout.addWidget(label)
+            text_layout.addWidget(label)
+
+            description = QLabel(i18n.t(plugin["description_key"]))
+            description.setWordWrap(True)
+            text_layout.addWidget(description)
+
+            row_layout.addWidget(text_widget, 1)
             row_layout.addStretch()
 
             btn_install = QPushButton(i18n.t("btn_install"))

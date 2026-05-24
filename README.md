@@ -48,7 +48,7 @@ Start with the **Onboard** panel for first-run initialization. Tutorial: [Wiki](
 - Configure local or online model settings in **LocalLLM** and **Model Switch**.
 - Configure bot channels in **Channels**.
 - Create and run instances in **Instances**, then update version or open folder/CLI when needed.
-- Install required extensions in **Plugins**.
+- Install required extensions in **Plugins**. Stop the instance first, install recommended plugins such as [`@xquik/tweetclaw`](https://github.com/Xquik-dev/tweetclaw) for X/Twitter automation, add required credentials in **Env Vars**, then restart the instance.
 - Use **Logs** and **Backups** for troubleshooting and data safety.
 - Tune tray behavior, auto-start, mirrors, and cleanup options in **Advanced**.
 
