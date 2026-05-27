@@ -176,8 +176,6 @@ class InstallManager:
             "npm": runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js",
             "npx": runtime_root / "lib" / "node_modules" / "npm" / "bin" / "npx-cli.js",
             "corepack": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "corepack.js",
-            "pnpm": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "pnpm.js",
-            "pnpx": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "pnpx.js",
             "yarn": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "yarn.js",
             "yarnpkg": runtime_root / "lib" / "node_modules" / "corepack" / "dist" / "yarnpkg.js",
         }
@@ -255,8 +253,6 @@ class InstallManager:
         if npm_registry:
             env["npm_config_registry"] = npm_registry
             env["NPM_CONFIG_REGISTRY"] = npm_registry
-            env["pnpm_config_registry"] = npm_registry
-            env["PNPM_CONFIG_REGISTRY"] = npm_registry
             env["COREPACK_NPM_REGISTRY"] = npm_registry
 
         node_mirror = Config.get_setting("node_mirror", "")
@@ -460,7 +456,7 @@ class InstallManager:
         return cls._find_runtime_tool(env, tool_name)
 
     @classmethod
-    def _run_pnpm(cls, instance_path: Path, args: list[str], env: dict, log_stream: Optional[TextIO] = None):
+    def _run_npm(cls, instance_path: Path, args: list[str], env: dict, log_stream: Optional[TextIO] = None):
         kwargs = {
             "cwd": instance_path,
             "env": env,
@@ -471,7 +467,7 @@ class InstallManager:
             kwargs["stdout"] = log_stream
             kwargs["stderr"] = subprocess.STDOUT
 
-        pnpm_runner = None
+        npm_runner = None
         effective_args = list(args)
 
         has_registry_arg = any(
@@ -480,40 +476,23 @@ class InstallManager:
         )
         if not has_registry_arg:
             registry = cls._normalize_registry(
-                env.get("pnpm_config_registry")
-                or env.get("PNPM_CONFIG_REGISTRY")
-                or env.get("npm_config_registry")
+                env.get("npm_config_registry")
                 or env.get("NPM_CONFIG_REGISTRY")
             )
             if registry:
                 effective_args.append(f"--registry={registry}")
 
         try:
-            pnpm_cmd = cls._find_runtime_tool(env, "pnpm")
-            pnpm_runner = [pnpm_cmd]
-        except FileNotFoundError:
-            try:
-                corepack_cmd = cls._find_runtime_tool(env, "corepack")
-            except FileNotFoundError as exc:
-                raise FileNotFoundError(
-                    "pnpm is not available in current runtime and corepack is missing. "
-                    "Please ensure Node runtime is installed from Dependencies, "
-                    "or provide pnpm/corepack in PATH."
-                ) from exc
+            npm_cmd = cls._find_runtime_tool(env, "npm")
+            npm_runner = [npm_cmd]
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                "npm is not available in current runtime. "
+                "Please ensure Node runtime is installed from Dependencies, "
+                "or provide npm in PATH."
+            ) from exc
 
-            try:
-                subprocess.run([corepack_cmd, "enable"], **kwargs)
-                subprocess.run([corepack_cmd, "prepare", "pnpm@latest", "--activate"], **kwargs)
-            except subprocess.CalledProcessError as exc:
-                raise RuntimeError(f"Failed to install pnpm via corepack: {exc}") from exc
-
-            try:
-                pnpm_cmd = cls._find_runtime_tool(env, "pnpm")
-                pnpm_runner = [pnpm_cmd]
-            except FileNotFoundError:
-                pnpm_runner = [corepack_cmd, "pnpm"]
-
-        subprocess.run([*pnpm_runner, *effective_args], **kwargs)
+        subprocess.run([*npm_runner, *effective_args], **kwargs)
 
         if log_stream is not None:
             log_stream.flush()
@@ -536,8 +515,6 @@ class InstallManager:
         env_file = instance_path / ".env.local"
         env_entries = {
             "OPENCLAW_PROFILE": instance_name,
-            "CLAWDBOT_PROFILE": instance_name,
-            "OPENCLAW_HOME": str(instance_path),
             "OPENCLAW_PORT": str(instance_port),
             "OPENCLAW_GATEWAY_TOKEN": resolved_gateway_token
         }
@@ -592,33 +569,10 @@ class InstallManager:
     @classmethod
     def install_dependencies(cls, instance_path: Path, instance_name: str, log_stream: Optional[TextIO] = None):
         """Install Node dependencies during instance initialization."""
-        # 创建 .npmrc 文件并写入指定内容
-        npmrc_path = instance_path / ".npmrc"
-        npmrc_content = """
-node-linker=hoisted
-package-import-method=copy
-store-dir=../../.pnpm-store
-""".strip() + "\n"
-        npmrc_path.write_text(npmrc_content, encoding="utf-8")
-
-        # Remove patchedDependencies from package.json since patches/ dir is not included in npm pack
-        package_json = instance_path / "package.json"
-        if package_json.exists():
-            try:
-                pkg_data = json.loads(package_json.read_text(encoding="utf-8"))
-                if "pnpm" in pkg_data and isinstance(pkg_data["pnpm"], dict):
-                    if "patchedDependencies" in pkg_data["pnpm"]:
-                        del pkg_data["pnpm"]["patchedDependencies"]
-                        if not pkg_data["pnpm"]:
-                            del pkg_data["pnpm"]
-                    package_json.write_text(json.dumps(pkg_data, indent=2) + "\n", encoding="utf-8")
-            except Exception as e:
-                logger.warning(f"Failed to remove patchedDependencies from package.json: {e}")
-
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
 
         logger.info(f"Installing dependencies in {instance_path}")
-        cls._run_pnpm(instance_path, ["install", "--prod"], env, log_stream=log_stream)
+        cls._run_npm(instance_path, ["install", "--omit=dev"], env, log_stream=log_stream)
 
     @classmethod
     def apply_windows_a2ui_patch(cls, instance_path: Path, log_stream: Optional[TextIO] = None):
