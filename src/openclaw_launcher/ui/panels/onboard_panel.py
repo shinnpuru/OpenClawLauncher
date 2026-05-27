@@ -11,6 +11,8 @@ from PySide6.QtCore import QThread, Signal, QTimer, Qt
 from PySide6.QtGui import QDesktopServices, QPixmap, QImageReader
 from PySide6.QtCore import QUrl
 from pathlib import Path
+import zipfile
+import os
 
 from ...core.config import Config
 from ...core.install_manager import InstallManager
@@ -138,6 +140,82 @@ class CreateSampleWorker(QThread):
             InstallManager.complete_install(self.instance_name, self.instance_port)
             self.progress_percentage.emit(100)
             self.completed.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class UpdateOpenClawWorker(QThread):
+    """Worker to update OpenClaw runtime to the latest version."""
+    finished = Signal()
+    error = Signal(str)
+    progress = Signal(str)
+    progress_percentage = Signal(int)
+
+    def __init__(self, instance_name: str = ""):
+        super().__init__()
+        self.instance_name = instance_name
+
+    def run(self):
+        try:
+            manager = RuntimeManager()
+
+            # Check current default version
+            current_version = manager.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW)
+
+            # Refresh available versions
+            self.progress.emit(i18n.t("onboard_status_refresh_openclaw"))
+            self.progress_percentage.emit(10)
+            manager.refresh_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
+
+            openclaw_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
+            if not openclaw_versions:
+                raise RuntimeError("No available OpenClaw versions")
+
+            latest_version = str(openclaw_versions[0]["version"])
+
+            # Check if already up to date
+            if current_version and current_version == latest_version:
+                self.progress.emit(i18n.t("msg_already_up_to_date"))
+                self.progress_percentage.emit(100)
+                self.finished.emit()
+                return
+
+            # Backup if instance exists
+            if self.instance_name:
+                instance_path = Config.get_instance_path(self.instance_name)
+                if instance_path.exists():
+                    self.progress.emit(i18n.t("msg_backing_up_instance", name=self.instance_name))
+                    self.progress_percentage.emit(20)
+                    backup_dir = Config.BASE_DIR / "backups"
+                    backup_dir.mkdir(parents=True, exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_name = f"{self.instance_name}_{timestamp}"
+                    output_file = backup_dir / backup_name
+                    # Create zip backup (excluding node_modules)
+                    zip_path = str(output_file) + '.zip'
+                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                        files_to_archive = []
+                        for root, dirs, files in os.walk(instance_path):
+                            if 'node_modules' in dirs:
+                                dirs.remove('node_modules')
+                            for file in files:
+                                file_path = Path(root) / file
+                                files_to_archive.append(file_path)
+                        total_files = len(files_to_archive)
+                        for idx, file_path in enumerate(files_to_archive):
+                            arcname = file_path.relative_to(instance_path)
+                            zipf.write(file_path, arcname)
+                    self.progress_percentage.emit(40)
+
+            # Install new version
+            self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=latest_version))
+            self.progress_percentage.emit(60)
+            manager.install_version(RuntimeManager.SOFTWARE_OPENCLAW, latest_version)
+            self.progress_percentage.emit(90)
+            manager.set_default_version(RuntimeManager.SOFTWARE_OPENCLAW, latest_version)
+
+            self.progress_percentage.emit(100)
+            self.finished.emit()
         except Exception as e:
             self.error.emit(str(e))
 
@@ -332,15 +410,15 @@ class OnboardPanel(QWidget):
         self.btn_webui_link.clicked.connect(self.open_sample_webui)
         self.btn_cli_launcher = QPushButton(i18n.t("onboard_btn_open_cli"))
         self.btn_cli_launcher.clicked.connect(self.open_sample_cli)
+        self.btn_update_version = QPushButton(i18n.t("btn_update_version"))
+        self.btn_update_version.clicked.connect(self.update_openclaw_version)
         self.btn_docs = QPushButton(i18n.t("onboard_btn_open_docs"))
         self.btn_docs.clicked.connect(lambda: self.open_url("https://docs.openclaw.ai"))
-        self.btn_wiki = QPushButton(i18n.t("onboard_btn_wiki"))
-        self.btn_wiki.clicked.connect(lambda: self.open_url("https://github.com/shinnpuru/OpenClawLauncher/wiki"))
 
         links_layout.addWidget(self.btn_webui_link)
         links_layout.addWidget(self.btn_cli_launcher)
+        links_layout.addWidget(self.btn_update_version)
         links_layout.addWidget(self.btn_docs)
-        links_layout.addWidget(self.btn_wiki)
         self.layout.addLayout(links_layout)
 
         self.layout.addSpacing(10)
@@ -621,12 +699,95 @@ class OnboardPanel(QWidget):
     def open_url(self, url: str):
         QDesktopServices.openUrl(QUrl(url))
 
+    def update_openclaw_version(self):
+        """Update OpenClaw runtime to the latest version."""
+        # If sample instance is running, warn user
+        if self._sample_running():
+            ret = QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("msg_update_requires_stop", name=self.SAMPLE_INSTANCE_NAME),
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if ret != QMessageBox.Yes:
+                return
+            try:
+                ProcessManager.stop_instance(self.SAMPLE_INSTANCE_NAME)
+            except Exception as e:
+                QMessageBox.critical(self, i18n.t("title_error"), str(e))
+                return
+
+        # Check dependencies exist
+        if not self._dependencies_ok():
+            QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("onboard_msg_dependencies_required"),
+            )
+            return
+
+        # Confirm update
+        res = QMessageBox.question(
+            self,
+            i18n.t("title_confirm_update"),
+            i18n.t("msg_confirm_update_version", name="OpenClaw"),
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if res != QMessageBox.Yes:
+            return
+
+        # Start update worker
+        self.update_worker = UpdateOpenClawWorker(self.SAMPLE_INSTANCE_NAME)
+        try:
+            self.update_worker.setParent(self)
+            self.update_worker.finished.connect(self.update_worker.deleteLater)
+        except Exception:
+            pass
+
+        self.update_worker.progress.connect(self.on_update_progress)
+        self.update_worker.progress_percentage.connect(self.on_update_progress_percentage)
+        self.update_worker.finished.connect(self.on_update_finished)
+        self.update_worker.error.connect(self.on_update_error)
+
+        self.progress_main.setVisible(True)
+        self.progress_main.setValue(0)
+        self.btn_update_version.setEnabled(False)
+        self.update_worker.start()
+
+    def on_update_progress(self, message: str):
+        self.lbl_status.setText(message)
+
+    def on_update_progress_percentage(self, percentage: int):
+        self.progress_main.setValue(percentage)
+
+    def on_update_finished(self):
+        self.update_worker = None
+        self.progress_main.setVisible(False)
+        self.btn_update_version.setEnabled(True)
+        QMessageBox.information(
+            self,
+            i18n.t("title_success"),
+            i18n.t("msg_update_success", name="OpenClaw", new_name="OpenClaw"),
+        )
+        self.refresh_status()
+
+    def on_update_error(self, error: str):
+        self.update_worker = None
+        self.progress_main.setVisible(False)
+        self.btn_update_version.setEnabled(True)
+        QMessageBox.critical(
+            self,
+            i18n.t("title_error"),
+            i18n.t("msg_update_error", name="OpenClaw", error=error),
+        )
+        self.refresh_status()
+
     def update_ui_texts(self):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.btn_webui_link.setText(i18n.t("onboard_btn_open_webui"))
         self.btn_cli_launcher.setText(i18n.t("onboard_btn_open_cli"))
+        self.btn_update_version.setText(i18n.t("btn_update_version"))
         self.btn_docs.setText(i18n.t("onboard_btn_open_docs"))
-        self.btn_wiki.setText(i18n.t("onboard_btn_wiki"))
         self.btn_one_click.setText(self.btn_one_click.text())
         self.refresh_status()
 
@@ -651,4 +812,13 @@ class OnboardPanel(QWidget):
                 worker.terminate()
                 worker.wait(500)
         self.sample_worker = None
+
+        worker = getattr(self, "update_worker", None)
+        if worker and worker.isRunning():
+            worker.requestInterruption()
+            worker.wait(1000)
+            if worker.isRunning():
+                worker.terminate()
+                worker.wait(500)
+        self.update_worker = None
 

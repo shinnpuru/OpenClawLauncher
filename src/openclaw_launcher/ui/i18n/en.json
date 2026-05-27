@@ -90,6 +90,7 @@
     "msg_update_success": "Instance {name} updated successfully. New environment: {new_name}.",
     "msg_update_failed": "Failed to update instance {name}.",
     "msg_update_error": "Failed to update instance {name}: {error}",
+    "msg_already_up_to_date": "Already up to date, no update needed.",
     "progress_update_preparing": "Preparing update...",
     "progress_update_migrating": "Migrating data...",
     "progress_update_fraction": "Migration {current}/{total}",

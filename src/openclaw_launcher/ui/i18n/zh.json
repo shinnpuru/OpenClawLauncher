@@ -91,6 +91,7 @@
     "msg_update_success": "实例 {name} 版本更新完成，新环境：{new_name}。",
     "msg_update_failed": "实例 {name} 版本更新失败。",
     "msg_update_error": "更新实例 {name} 失败: {error}",
+    "msg_already_up_to_date": "当前版本已是最新，无需更新。",
     "progress_update_preparing": "准备更新中...",
     "progress_update_migrating": "迁移数据中...",
     "progress_update_fraction": "迁移进度 {current}/{total}",
