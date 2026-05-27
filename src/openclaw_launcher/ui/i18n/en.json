@@ -242,6 +242,7 @@
     "ph_app_secret": "Enter App Secret",
     "msg_channel_requires_plugin_dingtalk": "DingTalk plugin is not installed, so this channel cannot be configured. Install @dingtalk-real-ai/dingtalk-connector in the Plugins tab first.",
     "msg_channel_requires_plugin_qq": "QQ plugin is not installed, so this channel cannot be configured. Install @sliverp/qqbot in the Plugins tab first.",
+    "msg_channel_requires_plugin_feishu": "Feishu plugin is not installed, so this channel cannot be configured. Install @openclaw/feishu in the Plugins tab first.",
     "msg_channel_requires_plugin_weixin": "Weixin plugin is not installed, so login is unavailable. Install openclaw-weixin in the Plugins tab first.",
     "msg_weixin_login_cli_launched": "Opened Weixin login CLI for {name}",
     "msg_weixin_login_cli_launch_failed": "Failed to open Weixin login CLI: {error}",

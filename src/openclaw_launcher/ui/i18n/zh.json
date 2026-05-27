@@ -243,6 +243,7 @@
     "ph_app_secret": "请输入 App Secret",
     "msg_channel_requires_plugin_dingtalk": "未安装 DingTalk 插件，当前不可配置。请先在“插件管理”中安装 @dingtalk-real-ai/dingtalk-connector。",
     "msg_channel_requires_plugin_qq": "未安装 QQ 插件，当前不可配置。请先在“插件管理”中安装 @sliverp/qqbot。",
+    "msg_channel_requires_plugin_feishu": "未安装 Feishu 插件，当前不可配置。请先在“插件管理”中安装 @openclaw/feishu。",
     "msg_channel_requires_plugin_weixin": "未安装 Weixin 插件，登录入口不可用。请先在“插件管理”中安装 openclaw-weixin。",
     "msg_weixin_login_cli_launched": "已为 {name} 打开微信登录命令行",
     "msg_weixin_login_cli_launch_failed": "打开微信登录命令行失败：{error}",

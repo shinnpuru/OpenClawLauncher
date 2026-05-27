@@ -22,13 +22,16 @@ from ..i18n import i18n
 class ChannelConfigPanel(QWidget):
     DINGTALK_PLUGIN = "dingtalk-connector"
     WEIXIN_PLUGIN = "openclaw-weixin"
+    FEISHU_PLUGIN = "@openclaw/feishu"
+    QQ_PLUGIN = "@sliverp/qqbot"
     telegram_KEYS = ("telegram", "telegram")
 
     def __init__(self):
         super().__init__()
-        self._active_telegram_key = "telegram"
         self._dingtalk_available = False
         self._weixin_available = False
+        self._feishu_available = False
+        self._qqbot_available = False
 
         self.layout = QVBoxLayout(self)
 
@@ -76,6 +79,10 @@ class ChannelConfigPanel(QWidget):
         self.feishu_app_secret_label = QLabel()
         self.channel_form.addRow(self.feishu_app_id_label, self.feishu_app_id)
         self.channel_form.addRow(self.feishu_app_secret_label, self.feishu_app_secret)
+        self.feishu_hint = QLabel("")
+        self.feishu_hint.setStyleSheet("color: orange;")
+        self.feishu_hint.setWordWrap(True)
+        self.channel_form.addRow("", self.feishu_hint)
 
         self.qq_app_id = QLineEdit()
         self.qq_app_secret = QLineEdit()
@@ -86,6 +93,10 @@ class ChannelConfigPanel(QWidget):
         self.qq_app_secret_label = QLabel()
         self.channel_form.addRow(self.qq_app_id_label, self.qq_app_id)
         self.channel_form.addRow(self.qq_app_secret_label, self.qq_app_secret)
+        self.qq_hint = QLabel("")
+        self.qq_hint.setStyleSheet("color: orange;")
+        self.qq_hint.setWordWrap(True)
+        self.channel_form.addRow("", self.qq_hint)
 
         self.dingtalk_app_id = QLineEdit()
         self.dingtalk_app_secret = QLineEdit()
@@ -220,12 +231,22 @@ class ChannelConfigPanel(QWidget):
     def _update_plugin_gate_state(self):
         self._dingtalk_available = self._is_plugin_installed(self.DINGTALK_PLUGIN)
         self._weixin_available = self._is_plugin_installed(self.WEIXIN_PLUGIN)
+        self._feishu_available = self._is_plugin_installed(self.FEISHU_PLUGIN)
+        self._qqbot_available = self._is_plugin_installed(self.QQ_PLUGIN)
 
         self._set_field_pair_enabled(self.dingtalk_app_id, self.dingtalk_app_secret, self._dingtalk_available)
+        self._set_field_pair_enabled(self.feishu_app_id, self.feishu_app_secret, self._feishu_available)
+        self._set_field_pair_enabled(self.qq_app_id, self.qq_app_secret, self._qqbot_available)
         self.btn_weixin_login.setEnabled(self._weixin_available)
 
         self.dingtalk_hint.setText(
             "" if self._dingtalk_available else i18n.t("msg_channel_requires_plugin_dingtalk")
+        )
+        self.feishu_hint.setText(
+            "" if self._feishu_available else i18n.t("msg_channel_requires_plugin_feishu")
+        )
+        self.qq_hint.setText(
+            "" if self._qqbot_available else i18n.t("msg_channel_requires_plugin_qq")
         )
         self.weixin_hint.setText(
             "" if self._weixin_available else i18n.t("msg_channel_requires_plugin_weixin")
@@ -269,15 +290,11 @@ class ChannelConfigPanel(QWidget):
 
             telegram_obj = None
             active_key = "telegram"
-            for key in self.telegram_KEYS:
-                obj = channels.get(key)
-                if isinstance(obj, dict):
-                    telegram_obj = obj
-                    active_key = key
-                    break
+            obj = channels.get(active_key)
+            if isinstance(obj, dict):
+                telegram_obj = obj
             if telegram_obj is None:
                 telegram_obj = {}
-            self._active_telegram_key = active_key
             self._set_text(self.telegram_token, telegram_obj.get("botToken"))
 
             feishu_obj = channels.get("feishu")
@@ -394,7 +411,7 @@ class ChannelConfigPanel(QWidget):
             )
             self._merge_channel(
                 channels_obj,
-                self._active_telegram_key,
+                "telegram",
                 {
                     "enabled": True,
                     "botToken": self.telegram_token.text().strip(),
@@ -402,32 +419,38 @@ class ChannelConfigPanel(QWidget):
                     "allowFrom": ["*"]
                 },
             )
-            self._merge_channel(
-                channels_obj,
-                "feishu",
-                {
-                    "renderMode": "card",
-                    "enabled": True,
-                    "appId": self.feishu_app_id.text().strip(),
-                    "appSecret": self.feishu_app_secret.text().strip(),
-                    "dmPolicy": "open",
-                    "allowFrom": ["*"]
-                },
-            )
-
-            self._merge_channel(
-                channels_obj,
-                "qqbot",
-                {
-                    "enabled": True,
-                    "appId": self.qq_app_id.text().strip(),
-                    "clientSecret": self.qq_app_secret.text().strip(),
-                    "dmPolicy": "open",
-                    "allowFrom": ["*"]
-                },
-            )
-
             skipped = []
+            if self._feishu_available:
+                self._merge_channel(
+                    channels_obj,
+                    "feishu",
+                    {
+                        "renderMode": "card",
+                        "enabled": True,
+                        "appId": self.feishu_app_id.text().strip(),
+                        "appSecret": self.feishu_app_secret.text().strip(),
+                        "dmPolicy": "open",
+                        "allowFrom": ["*"]
+                    },
+                )
+            else:
+                skipped.append("Feishu")
+
+            if self._qqbot_available:
+                self._merge_channel(
+                    channels_obj,
+                    "qqbot",
+                    {
+                        "enabled": True,
+                        "appId": self.qq_app_id.text().strip(),
+                        "clientSecret": self.qq_app_secret.text().strip(),
+                        "dmPolicy": "open",
+                        "allowFrom": ["*"]
+                    },
+                )
+            else:
+                skipped.append("QQBot")
+
             if self._dingtalk_available:
                 self._merge_channel(
                     channels_obj,
@@ -441,6 +464,8 @@ class ChannelConfigPanel(QWidget):
                         "allowFrom": ["*"]
                     },
                 )
+            else:
+                skipped.append("DingTalk")
 
             config_data["channels"] = channels_obj
             config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

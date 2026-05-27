@@ -205,6 +205,14 @@ class PluginUninstallWorker(QThread):
 class PluginPanel(QWidget):
     RECOMMENDED_PLUGINS = [
         {
+            "name": "@openclaw/feishu",
+            "url": "https://docs.openclaw.ai/plugins/reference/feishu",
+        },
+        {
+            "name": "@openclaw/qqbot",
+            "url": "https://docs.openclaw.ai/plugins/reference/qqbot",
+        },
+        {
             "name": "@dingtalk-real-ai/dingtalk-connector",
             "url": "https://github.com/DingTalk-Real-AI/dingtalk-openclaw-connector",
         },
@@ -734,14 +742,12 @@ class PluginPanel(QWidget):
             if not instance_path or not instance_name:
                 return
 
-            gateway_token = InstallManager.get_instance_gateway_token(instance_path, instance_name)
             default_entry = (
                 "dingtalk-connector",
                 {
                     "enabled": True,
                     "clientId": "Your client id",
                     "clientSecret": "your secret",
-                    "gatewayToken": gateway_token,
                 },
             )
 
