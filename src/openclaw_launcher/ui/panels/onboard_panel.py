@@ -11,7 +11,6 @@ from PySide6.QtCore import QThread, Signal, QTimer, Qt
 from PySide6.QtGui import QDesktopServices, QPixmap, QImageReader
 from PySide6.QtCore import QUrl
 from pathlib import Path
-import zipfile
 import os
 
 from ...core.config import Config
@@ -20,7 +19,6 @@ from ...core.process_manager import ProcessManager
 from ...core.runtime_manager import RuntimeManager
 from ..i18n import i18n
 from datetime import datetime
-from pathlib import Path
 
 
 def _resolve_logo_path() -> str | None:
@@ -145,7 +143,7 @@ class CreateSampleWorker(QThread):
 
 
 class UpdateOpenClawWorker(QThread):
-    """Worker to update OpenClaw runtime to the latest version."""
+    """Worker to update OpenClaw runtime to the latest version using InstallManager."""
     finished = Signal()
     error = Signal(str)
     progress = Signal(str)
@@ -157,64 +155,23 @@ class UpdateOpenClawWorker(QThread):
 
     def run(self):
         try:
-            manager = RuntimeManager()
+            def _progress_callback(stage: str, current: int, total: int, detail: str):
+                """Handle progress updates from InstallManager."""
+                if stage == "overwriting":
+                    self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=detail or "latest"))
+                    self.progress_percentage.emit(30)
+                elif stage == "reinstalling":
+                    self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=""))
+                    self.progress_percentage.emit(70)
+                elif stage == "done":
+                    self.progress_percentage.emit(100)
 
-            # Check current default version
-            current_version = manager.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW)
+            # Use InstallManager's update function
+            InstallManager.update_instance_to_default_version(
+                self.instance_name,
+                progress_callback=_progress_callback
+            )
 
-            # Refresh available versions
-            self.progress.emit(i18n.t("onboard_status_refresh_openclaw"))
-            self.progress_percentage.emit(10)
-            manager.refresh_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
-
-            openclaw_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
-            if not openclaw_versions:
-                raise RuntimeError("No available OpenClaw versions")
-
-            latest_version = str(openclaw_versions[0]["version"])
-
-            # Check if already up to date
-            if current_version and current_version == latest_version:
-                self.progress.emit(i18n.t("msg_already_up_to_date"))
-                self.progress_percentage.emit(100)
-                self.finished.emit()
-                return
-
-            # Backup if instance exists
-            if self.instance_name:
-                instance_path = Config.get_instance_path(self.instance_name)
-                if instance_path.exists():
-                    self.progress.emit(i18n.t("msg_backing_up_instance", name=self.instance_name))
-                    self.progress_percentage.emit(20)
-                    backup_dir = Config.BASE_DIR / "backups"
-                    backup_dir.mkdir(parents=True, exist_ok=True)
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_name = f"{self.instance_name}_{timestamp}"
-                    output_file = backup_dir / backup_name
-                    # Create zip backup (excluding node_modules)
-                    zip_path = str(output_file) + '.zip'
-                    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                        files_to_archive = []
-                        for root, dirs, files in os.walk(instance_path):
-                            if 'node_modules' in dirs:
-                                dirs.remove('node_modules')
-                            for file in files:
-                                file_path = Path(root) / file
-                                files_to_archive.append(file_path)
-                        total_files = len(files_to_archive)
-                        for idx, file_path in enumerate(files_to_archive):
-                            arcname = file_path.relative_to(instance_path)
-                            zipf.write(file_path, arcname)
-                    self.progress_percentage.emit(40)
-
-            # Install new version
-            self.progress.emit(i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_openclaw"), version=latest_version))
-            self.progress_percentage.emit(60)
-            manager.install_version(RuntimeManager.SOFTWARE_OPENCLAW, latest_version)
-            self.progress_percentage.emit(90)
-            manager.set_default_version(RuntimeManager.SOFTWARE_OPENCLAW, latest_version)
-
-            self.progress_percentage.emit(100)
             self.finished.emit()
         except Exception as e:
             self.error.emit(str(e))
