@@ -17,23 +17,23 @@ from ...core.config import Config
 from ...core.install_manager import InstallManager
 from ...core.process_manager import ProcessManager
 from ..i18n import i18n
-
+from .plugin_panel import PluginPanel, PluginInstallWorker
 
 class ChannelConfigPanel(QWidget):
-    DINGTALK_PLUGIN = "dingtalk-connector"
-    WEIXIN_PLUGIN = "openclaw-weixin"
+    DINGTALK_PLUGIN = "@dingtalk-real-ai/dingtalk-connector"
+    WEIXIN_PLUGIN = "@tencent-weixin/openclaw-weixin"
     FEISHU_PLUGIN = "@openclaw/feishu"
-    QQ_PLUGIN = "@sliverp/qqbot"
-    telegram_KEYS = ("telegram", "telegram")
+    QQ_PLUGIN = "@openclaw/qqbot"
 
     def __init__(self):
         super().__init__()
+        self.install_worker = None
         self._dingtalk_available = False
         self._weixin_available = False
         self._feishu_available = False
         self._qqbot_available = False
 
-        self.layout = QVBoxLayout(self)
+        self.main_layout = QVBoxLayout(self)
 
         instance_row = QHBoxLayout()
         self.instance_label = QLabel(i18n.t("lbl_select_instance"))
@@ -46,13 +46,13 @@ class ChannelConfigPanel(QWidget):
         self.btn_refresh = QPushButton(i18n.t("btn_refresh"))
         self.btn_refresh.clicked.connect(self.refresh)
         instance_row.addWidget(self.btn_refresh)
-        self.layout.addLayout(instance_row)
+        self.main_layout.addLayout(instance_row)
 
         self.status_label = QLabel(i18n.t("status_ready"))
-        self.layout.addWidget(self.status_label)
+        self.main_layout.addWidget(self.status_label)
 
         self.config_container = QWidget()
-        self.layout.addWidget(self.config_container)
+        self.main_layout.addWidget(self.config_container)
 
         group_layout = QVBoxLayout(self.config_container)
         group_layout.setContentsMargins(0, 0, 0, 0)
@@ -72,67 +72,92 @@ class ChannelConfigPanel(QWidget):
 
         self.feishu_app_id = QLineEdit()
         self.feishu_app_secret = QLineEdit()
-        self.feishu_app_secret.setEchoMode(QLineEdit.Password)
+        self.feishu_app_secret.setEchoMode(QLineEdit.EchoMode.Password)
         self.feishu_app_id.setPlaceholderText(i18n.t("ph_app_id"))
         self.feishu_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
         self.feishu_app_id_label = QLabel()
         self.feishu_app_secret_label = QLabel()
         self.channel_form.addRow(self.feishu_app_id_label, self.feishu_app_id)
         self.channel_form.addRow(self.feishu_app_secret_label, self.feishu_app_secret)
+        self.feishu_hint_layout = QHBoxLayout()
         self.feishu_hint = QLabel("")
         self.feishu_hint.setStyleSheet("color: orange;")
         self.feishu_hint.setWordWrap(True)
-        self.channel_form.addRow("", self.feishu_hint)
+        self.btn_install_feishu = QPushButton(i18n.t("btn_install"))
+        self.btn_install_feishu.clicked.connect(lambda: self.start_install(self.FEISHU_PLUGIN))
+        self.btn_install_feishu.hide()
+        self.feishu_hint_layout.addWidget(self.feishu_hint)
+        self.feishu_hint_layout.addWidget(self.btn_install_feishu)
+        self.feishu_hint_layout.addStretch()
+        group_layout.addLayout(self.feishu_hint_layout)
 
         self.qq_app_id = QLineEdit()
         self.qq_app_secret = QLineEdit()
-        self.qq_app_secret.setEchoMode(QLineEdit.Password)
+        self.qq_app_secret.setEchoMode(QLineEdit.EchoMode.Password)
         self.qq_app_id.setPlaceholderText(i18n.t("ph_app_id"))
         self.qq_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
         self.qq_app_id_label = QLabel()
         self.qq_app_secret_label = QLabel()
         self.channel_form.addRow(self.qq_app_id_label, self.qq_app_id)
         self.channel_form.addRow(self.qq_app_secret_label, self.qq_app_secret)
+        self.qq_hint_layout = QHBoxLayout()
         self.qq_hint = QLabel("")
         self.qq_hint.setStyleSheet("color: orange;")
         self.qq_hint.setWordWrap(True)
-        self.channel_form.addRow("", self.qq_hint)
+        self.btn_install_qq = QPushButton(i18n.t("btn_install"))
+        self.btn_install_qq.clicked.connect(lambda: self.start_install(self.QQ_PLUGIN))
+        self.btn_install_qq.hide()
+        self.qq_hint_layout.addWidget(self.qq_hint)
+        self.qq_hint_layout.addWidget(self.btn_install_qq)
+        self.qq_hint_layout.addStretch()
+        group_layout.addLayout(self.qq_hint_layout)
 
         self.dingtalk_app_id = QLineEdit()
         self.dingtalk_app_secret = QLineEdit()
-        self.dingtalk_app_secret.setEchoMode(QLineEdit.Password)
+        self.dingtalk_app_secret.setEchoMode(QLineEdit.EchoMode.Password)
         self.dingtalk_app_id.setPlaceholderText(i18n.t("ph_app_id"))
         self.dingtalk_app_secret.setPlaceholderText(i18n.t("ph_app_secret"))
         self.dingtalk_app_id_label = QLabel()
         self.dingtalk_app_secret_label = QLabel()
         self.channel_form.addRow(self.dingtalk_app_id_label, self.dingtalk_app_id)
         self.channel_form.addRow(self.dingtalk_app_secret_label, self.dingtalk_app_secret)
-
+        self.dingtalk_hint_layout = QHBoxLayout()
         self.dingtalk_hint = QLabel("")
         self.dingtalk_hint.setStyleSheet("color: orange;")
         self.dingtalk_hint.setWordWrap(True)
-        group_layout.addWidget(self.dingtalk_hint)
+        self.btn_install_dingtalk = QPushButton(i18n.t("btn_install"))
+        self.btn_install_dingtalk.clicked.connect(lambda: self.start_install(self.DINGTALK_PLUGIN))
+        self.btn_install_dingtalk.hide()
+        self.dingtalk_hint_layout.addWidget(self.dingtalk_hint)
+        self.dingtalk_hint_layout.addWidget(self.btn_install_dingtalk)
+        self.dingtalk_hint_layout.addStretch()
+        group_layout.addLayout(self.dingtalk_hint_layout)
 
         self.weixin_login_row = QHBoxLayout()
         self.weixin_login_label = QLabel()
         self.weixin_login_row.addWidget(self.weixin_login_label)
         self.weixin_login_row.addStretch()
-
         self.btn_weixin_login = QPushButton(i18n.t("btn_channel_login"))
         self.btn_weixin_login.clicked.connect(self.login_weixin_channel)
         self.weixin_login_row.addWidget(self.btn_weixin_login)
-        group_layout.addLayout(self.weixin_login_row)
-
+        self.channel_form.addRow(self.weixin_login_row)
+        self.weixin_hint_layout = QHBoxLayout()
         self.weixin_hint = QLabel("")
         self.weixin_hint.setStyleSheet("color: orange;")
         self.weixin_hint.setWordWrap(True)
-        group_layout.addWidget(self.weixin_hint)
+        self.btn_install_weixin = QPushButton(i18n.t("btn_install"))
+        self.btn_install_weixin.clicked.connect(lambda: self.start_install(self.WEIXIN_PLUGIN))
+        self.btn_install_weixin.hide()
+        self.weixin_hint_layout.addWidget(self.weixin_hint)
+        self.weixin_hint_layout.addWidget(self.btn_install_weixin)
+        self.weixin_hint_layout.addStretch()
+        group_layout.addLayout(self.weixin_hint_layout)
 
         self.btn_save = QPushButton(i18n.t("btn_save"))
         self.btn_save.clicked.connect(self.save_channel_config)
-        self.layout.addWidget(self.btn_save)
+        self.main_layout.addWidget(self.btn_save)
 
-        self.layout.addStretch()
+        self.main_layout.addStretch()
 
         self._update_channel_field_labels()
         self._load_instances()
@@ -179,60 +204,16 @@ class ChannelConfigPanel(QWidget):
             return None
         return Config.get_instance_path(instance_name)
 
-    def _is_plugin_installed(self, plugin_name: str) -> bool:
-        instance_path = self._get_selected_instance_path()
-        if not instance_path:
-            return False
-
-        normalized = plugin_name.strip().lower()
-        if not normalized:
-            return False
-
-        installs_path = instance_path / ".openclaw" / "plugins" / "installs.json"
-        if not installs_path.exists():
-            return False
-
-        try:
-            loaded = json.loads(installs_path.read_text(encoding="utf-8"))
-        except Exception:
-            return False
-
-        if not isinstance(loaded, dict):
-            return False
-
-        install_records = loaded.get("installRecords")
-        if not isinstance(install_records, dict):
-            return False
-
-        for record_key, record in install_records.items():
-            candidates = []
-            if isinstance(record_key, str):
-                candidates.append(record_key)
-
-            if isinstance(record, dict):
-                for field in ("spec", "resolvedName", "resolvedSpec", "packageName", "name", "pluginId"):
-                    value = record.get(field)
-                    if isinstance(value, str):
-                        candidates.append(value)
-
-            for candidate in candidates:
-                candidate_lower = candidate.strip().lower()
-                if candidate_lower == normalized:
-                    return True
-                if candidate_lower.startswith(f"{normalized}@"):
-                    return True
-
-        return False
-
     def _set_field_pair_enabled(self, app_id_edit: QLineEdit, app_secret_edit: QLineEdit, enabled: bool):
         app_id_edit.setEnabled(enabled)
         app_secret_edit.setEnabled(enabled)
 
     def _update_plugin_gate_state(self):
-        self._dingtalk_available = self._is_plugin_installed(self.DINGTALK_PLUGIN)
-        self._weixin_available = self._is_plugin_installed(self.WEIXIN_PLUGIN)
-        self._feishu_available = self._is_plugin_installed(self.FEISHU_PLUGIN)
-        self._qqbot_available = self._is_plugin_installed(self.QQ_PLUGIN)
+        instance_path = self._get_selected_instance_path()
+        self._dingtalk_available = PluginPanel.is_plugin_installed(instance_path, self.DINGTALK_PLUGIN)
+        self._weixin_available = PluginPanel.is_plugin_installed(instance_path, self.WEIXIN_PLUGIN)
+        self._feishu_available = PluginPanel.is_plugin_installed(instance_path, self.FEISHU_PLUGIN)
+        self._qqbot_available = PluginPanel.is_plugin_installed(instance_path, self.QQ_PLUGIN)
 
         self._set_field_pair_enabled(self.dingtalk_app_id, self.dingtalk_app_secret, self._dingtalk_available)
         self._set_field_pair_enabled(self.feishu_app_id, self.feishu_app_secret, self._feishu_available)
@@ -251,6 +232,11 @@ class ChannelConfigPanel(QWidget):
         self.weixin_hint.setText(
             "" if self._weixin_available else i18n.t("msg_channel_requires_plugin_weixin")
         )
+
+        self.btn_install_dingtalk.setVisible(not self._dingtalk_available)
+        self.btn_install_feishu.setVisible(not self._feishu_available)
+        self.btn_install_qq.setVisible(not self._qqbot_available)
+        self.btn_install_weixin.setVisible(not self._weixin_available)
 
     def _update_controls_state(self):
         enabled = self._has_selected_instance()
@@ -355,9 +341,9 @@ class ChannelConfigPanel(QWidget):
             self,
             i18n.t("title_confirm"),
             i18n.t("msg_channel_save_requires_stop_confirm", name=instance_name),
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return False
 
         try:
@@ -511,6 +497,81 @@ class ChannelConfigPanel(QWidget):
                 i18n.t("title_error"),
                 i18n.t("msg_weixin_login_cli_launch_failed", error=str(e)),
             )
+
+    def _detect_openclaw_home(self) -> Path:
+        instance_path = self._get_selected_instance_path()
+        if not instance_path:
+            raise FileNotFoundError(i18n.t("msg_select_instance_required"))
+        if (instance_path / "openclaw.mjs").exists():
+            return instance_path
+        raise FileNotFoundError(i18n.t("msg_openclaw_home_not_found"))
+
+    def start_install(self, plugin_name: str):
+        if self.install_worker:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_plugin_install_busy"))
+            return
+
+        instance_name = self.instance_selector.currentData()
+        if not instance_name:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_select_instance_required"))
+            return
+
+        if ProcessManager.get_status(instance_name) == "Running":
+            QMessageBox.warning(
+                self,
+                i18n.t("title_warning"),
+                i18n.t("msg_plugin_install_requires_stopped_instance"),
+            )
+            return
+
+        try:
+            openclaw_home = self._detect_openclaw_home()
+        except Exception as e:
+            QMessageBox.critical(self, i18n.t("title_error"), str(e))
+            return
+
+        self.status_label.setText(i18n.t("msg_plugin_installing", name=plugin_name))
+
+        worker = PluginInstallWorker(
+            openclaw_home=openclaw_home,
+            plugin_name=plugin_name,
+            instance_name=instance_name,
+        )
+        try:
+            worker.setParent(self)
+            worker.finished.connect(worker.deleteLater)
+        except Exception:
+            pass
+
+        worker.completed.connect(lambda output: self._on_install_completed(plugin_name, output))
+        worker.error.connect(lambda error: self._on_install_error(plugin_name, error))
+        worker.finished.connect(self._cleanup_install_worker)
+        worker.start()
+        self.install_worker = worker
+
+    def _on_install_completed(self, plugin_name: str, output: str):
+        self.status_label.setText(i18n.t("msg_plugin_install_success", name=plugin_name))
+        self._update_plugin_gate_state()
+        QMessageBox.information(
+            self,
+            i18n.t("title_success"),
+            i18n.t("msg_plugin_install_success", name=plugin_name),
+        )
+
+    def _on_install_error(self, plugin_name: str, error: str):
+        self.status_label.setText(i18n.t("msg_plugin_install_failed_short", name=plugin_name))
+        QMessageBox.critical(
+            self,
+            i18n.t("title_error"),
+            i18n.t("msg_plugin_install_failed", name=plugin_name, error=error),
+        )
+
+    def _cleanup_install_worker(self):
+        worker = self.install_worker
+        if worker is None:
+            return
+        self.install_worker = None
+        worker.deleteLater()
 
     def update_ui_texts(self):
         self.instance_label.setText(i18n.t("lbl_select_instance"))

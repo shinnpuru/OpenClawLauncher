@@ -203,32 +203,13 @@ class PluginUninstallWorker(QThread):
 
 
 class PluginPanel(QWidget):
-    RECOMMENDED_PLUGINS = [
-        {
-            "name": "@openclaw/feishu",
-            "url": "https://docs.openclaw.ai/plugins/reference/feishu",
-        },
-        {
-            "name": "@openclaw/qqbot",
-            "url": "https://docs.openclaw.ai/plugins/reference/qqbot",
-        },
-        {
-            "name": "@dingtalk-real-ai/dingtalk-connector",
-            "url": "https://github.com/DingTalk-Real-AI/dingtalk-openclaw-connector",
-        },
-        {
-            "name": "@tencent-weixin/openclaw-weixin",
-            "url": "https://github.com/Tencent/openclaw-weixin",
-        },
-    ]
 
     def __init__(self):
         super().__init__()
         self.install_worker = None
         self.uninstall_worker = None
-        self.recommended_install_buttons = {}
 
-        self.layout = QVBoxLayout(self)
+        self.main_layout = QVBoxLayout(self)
         
         instance_row = QHBoxLayout()
         self.instance_label = QLabel(i18n.t("lbl_select_instance"))
@@ -241,26 +222,26 @@ class PluginPanel(QWidget):
         self.btn_refresh = QPushButton(i18n.t("btn_refresh"))
         self.btn_refresh.clicked.connect(self.refresh_plugins)
         instance_row.addWidget(self.btn_refresh)
-        self.layout.addLayout(instance_row)
+        self.main_layout.addLayout(instance_row)
 
         self.plugin_tree = QTreeWidget()
         self.plugin_tree.setColumnCount(3)
         self.plugin_tree.setRootIsDecorated(True)
-        self.layout.addWidget(self.plugin_tree)
+        self.main_layout.addWidget(self.plugin_tree)
 
         self.status_label = QLabel(i18n.t("status_ready"))
-        self.layout.addWidget(self.status_label)
+        self.main_layout.addWidget(self.status_label)
 
         self.install_progress = QProgressBar()
         self.install_progress.setVisible(False)
         self.install_progress.setTextVisible(False)
-        self.layout.addWidget(self.install_progress)
+        self.main_layout.addWidget(self.install_progress)
 
         self.uninstall_progress = QProgressBar()
         self.uninstall_progress.setVisible(False)
         self.uninstall_progress.setTextVisible(True)
         self.uninstall_progress.setFormat(i18n.t("progress_delete_running"))
-        self.layout.addWidget(self.uninstall_progress)
+        self.main_layout.addWidget(self.uninstall_progress)
 
         install_row = QHBoxLayout()
         self.plugin_input = QLineEdit()
@@ -271,107 +252,78 @@ class PluginPanel(QWidget):
         self.btn_install.clicked.connect(self.install_from_input)
         install_row.addWidget(self.btn_install)
 
-        self.layout.addLayout(install_row)
-
-        self.recommended_group = QGroupBox(i18n.t("section_recommended_plugins"))
-        self.recommended_layout = QVBoxLayout(self.recommended_group)
-        self.layout.addWidget(self.recommended_group)
-        self._build_recommended_rows()
+        self.main_layout.addLayout(install_row)
 
         self.update_ui_texts()
         self._load_instances()
         self.refresh_plugins()
 
-    def _build_recommended_rows(self):
-        while self.recommended_layout.count():
-            item = self.recommended_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+    @staticmethod
+    def is_plugin_installed(instance_path: Path | None, plugin_name: str) -> bool:
+        if not instance_path:
+            return False
 
-        self.recommended_install_buttons = {}
-
-        for plugin in self.RECOMMENDED_PLUGINS:
-            row_widget = QWidget()
-            row_layout = QHBoxLayout(row_widget)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-
-            label = QLabel(plugin["name"])
-            row_layout.addWidget(label)
-            row_layout.addStretch()
-
-            btn_install = QPushButton(i18n.t("btn_install"))
-            btn_install.clicked.connect(
-                lambda checked=False, package_name=plugin["name"]: self.start_recommended_install(package_name)
-            )
-            row_layout.addWidget(btn_install)
-            self.recommended_install_buttons[plugin["name"]] = btn_install
-
-            btn_help = QPushButton(i18n.t("btn_help"))
-            btn_help.clicked.connect(
-                lambda checked=False, url=plugin["url"]: QDesktopServices.openUrl(QUrl(url))
-            )
-            row_layout.addWidget(btn_help)
-
-            self.recommended_layout.addWidget(row_widget)
-
-        self._update_recommended_controls_state()
-
-    def _update_recommended_controls_state(self):
-        enable_install = (
-            self._has_selected_instance()
-            and self.install_worker is None
-            and self.uninstall_worker is None
-        )
-        for plugin_name, button in self.recommended_install_buttons.items():
-            is_installed = self._is_recommended_plugin_installed(plugin_name)
-            button.setEnabled(enable_install and (not is_installed))
-
-    def _is_recommended_plugin_installed(self, plugin_name: str) -> bool:
         normalized = plugin_name.strip().lower()
         if not normalized:
             return False
 
-        install_records = self._read_install_records()
-        for record_key, record in install_records.items():
-            candidates = []
-            if isinstance(record_key, str):
-                candidates.append(record_key)
+        projects_dir = instance_path / ".openclaw" / "npm" / "projects"
+        if not projects_dir.exists() or not projects_dir.is_dir():
+            return False
 
-            if isinstance(record, dict):
-                for field in ("spec", "resolvedName", "resolvedSpec", "packageName", "name", "pluginId"):
-                    value = record.get(field)
-                    if isinstance(value, str):
-                        candidates.append(value)
-
-            for candidate in candidates:
-                candidate_lower = candidate.strip().lower()
-                if candidate_lower == normalized:
-                    return True
-                if candidate_lower.startswith(f"{normalized}@"):
-                    return True
+        try:
+            for proj_dir in projects_dir.iterdir():
+                if not proj_dir.is_dir():
+                    continue
+                pkg_json = proj_dir / "package.json"
+                if not pkg_json.exists():
+                    continue
+                try:
+                    data = json.loads(pkg_json.read_text(encoding="utf-8"))
+                    deps = data.get("dependencies", {})
+                    if not isinstance(deps, dict):
+                        continue
+                    for d_name in deps.keys():
+                        candidate = d_name.strip().lower()
+                        if candidate == normalized or candidate.startswith(f"{normalized}@"):
+                            return True
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
         return False
 
-    def _read_install_records(self) -> dict:
-        instance_path = self._get_selected_instance_path()
-        if not instance_path:
-            return {}
-
-        installs_path = instance_path / ".openclaw" / "plugins" / "installs.json"
-        if not installs_path.exists():
-            return {}
+    def _get_installed_plugins(self, instance_path: Path) -> list:
+        plugins = []
+        projects_dir = instance_path / ".openclaw" / "npm" / "projects"
+        if not projects_dir.exists() or not projects_dir.is_dir():
+            return plugins
 
         try:
-            loaded = json.loads(installs_path.read_text(encoding="utf-8"))
+            for proj_dir in projects_dir.iterdir():
+                if not proj_dir.is_dir():
+                    continue
+                pkg_json = proj_dir / "package.json"
+                if not pkg_json.exists():
+                    continue
+                try:
+                    data = json.loads(pkg_json.read_text(encoding="utf-8"))
+                    deps = data.get("dependencies", {})
+                    if not isinstance(deps, dict):
+                        continue
+                    for d_name, d_version in deps.items():
+                        v = str(d_version).replace("^", "").replace("~", "")
+                        plugins.append({
+                            "name": d_name,
+                            "version": v,
+                            "path": proj_dir
+                        })
+                except Exception:
+                    continue
         except Exception:
-            return {}
-
-        if not isinstance(loaded, dict):
-            return {}
-
-        install_records = loaded.get("installRecords")
-        return install_records if isinstance(install_records, dict) else {}
+            pass
+        return plugins
 
     def _load_instances(self, selected_name: str | None = None):
         self.instance_selector.blockSignals(True)
@@ -401,7 +353,6 @@ class PluginPanel(QWidget):
     def _update_install_controls_state(self):
         enable_install = self._has_selected_instance() and self.install_worker is None and self.uninstall_worker is None
         self.btn_install.setEnabled(enable_install)
-        self._update_recommended_controls_state()
 
     def _get_selected_instance_path(self) -> Path | None:
         instance_name = self.instance_selector.currentData()
@@ -436,64 +387,19 @@ class PluginPanel(QWidget):
             self.status_label.setText(i18n.t("msg_instance_not_found"))
             return
 
-        install_records = self._read_install_records()
-        if not install_records:
+        installed_plugins = self._get_installed_plugins(instance_path)
+        if not installed_plugins:
             empty_item = QTreeWidgetItem([i18n.t("status_empty"), "", ""])
             self.plugin_tree.addTopLevelItem(empty_item)
             self.status_label.setText(i18n.t("status_ready"))
-            self._update_recommended_controls_state()
             return
 
-        rows = []
-        unknown_path = instance_path / ".openclaw" / "plugins" / "unknown-install-path"
-        for record_key, record in install_records.items():
-            if not isinstance(record, dict):
-                continue
-
-            uninstall_name = ""
-            for field in ("resolvedName", "spec", "name", "packageName"):
-                value = record.get(field)
-                if isinstance(value, str) and value.strip():
-                    uninstall_name = value.strip()
-                    break
-            if not uninstall_name and isinstance(record_key, str):
-                uninstall_name = record_key.strip()
-            if not uninstall_name:
-                continue
-
-            # determine version
-            version = ""
-            for vf in ("resolvedVersion", "version", "packageVersion", "resolvedSpec"):
-                v = record.get(vf)
-                if isinstance(v, str) and v.strip():
-                    if vf == "resolvedSpec" and "@" in v:
-                        parts = v.rsplit("@", 1)
-                        if len(parts) == 2 and parts[1].strip():
-                            version = parts[1].strip()
-                        else:
-                            version = v.strip()
-                    else:
-                        version = v.strip()
-                    break
-
-            install_path_value = record.get("installPath")
-            install_path = Path(install_path_value) if isinstance(install_path_value, str) and install_path_value else unknown_path
-            rows.append((uninstall_name, version, install_path))
-
-        if not rows:
-            empty_item = QTreeWidgetItem([i18n.t("status_empty"), "", ""])
-            self.plugin_tree.addTopLevelItem(empty_item)
-            self.status_label.setText(i18n.t("status_ready"))
-            self._update_recommended_controls_state()
-            return
-
-        for display_name, version, install_path in sorted(rows, key=lambda x: x[0].lower()):
-            plugin_item = QTreeWidgetItem([display_name, version, ""])
+        for plugin in sorted(installed_plugins, key=lambda x: x["name"].lower()):
+            plugin_item = QTreeWidgetItem([plugin["name"], plugin["version"], ""])
             self.plugin_tree.addTopLevelItem(plugin_item)
-            self._add_uninstall_button(plugin_item, display_name, install_path)
+            self._add_uninstall_button(plugin_item, plugin["name"], plugin["path"])
 
         self.status_label.setText(i18n.t("status_ready"))
-        self._update_recommended_controls_state()
 
     def _add_uninstall_button(self, item: QTreeWidgetItem, plugin_name: str, plugin_path: Path):
         button = QPushButton(i18n.t("btn_uninstall"))
@@ -517,9 +423,9 @@ class PluginPanel(QWidget):
             self,
             i18n.t("title_confirm"),
             i18n.t("msg_confirm_uninstall", name=plugin_name),
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
 
         instance_name = self.instance_selector.currentData()
@@ -598,11 +504,11 @@ class PluginPanel(QWidget):
 
     def _show_manual_cleanup_dialog(self, path: Path, message: str):
         dialog = QMessageBox(self)
-        dialog.setIcon(QMessageBox.Warning)
+        dialog.setIcon(QMessageBox.Icon.Warning)
         dialog.setWindowTitle(i18n.t("title_warning"))
         dialog.setText(message)
-        btn_open = dialog.addButton(i18n.t("btn_open_folder"), QMessageBox.ActionRole)
-        dialog.addButton(QMessageBox.Close)
+        btn_open = dialog.addButton(i18n.t("btn_open_folder"), QMessageBox.ButtonRole.ActionRole)
+        dialog.addButton(QMessageBox.StandardButton.Close)
         dialog.exec()
 
         if dialog.clickedButton() == btn_open and path.exists():
@@ -613,9 +519,6 @@ class PluginPanel(QWidget):
         if not plugin_name:
             QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_plugin_name_required"))
             return
-        self.start_install(plugin_name)
-
-    def start_recommended_install(self, plugin_name: str):
         self.start_install(plugin_name)
 
     def start_install(self, plugin_name: str):
@@ -746,8 +649,8 @@ class PluginPanel(QWidget):
                 "dingtalk-connector",
                 {
                     "enabled": True,
-                    "clientId": "Your client id",
-                    "clientSecret": "your secret",
+                    "clientId": "Your Client ID",
+                    "clientSecret": "your Secret",
                 },
             )
 
@@ -792,8 +695,6 @@ class PluginPanel(QWidget):
         self.btn_refresh.setEnabled(not installing)
         self.instance_selector.setEnabled(not installing)
         self.plugin_tree.setEnabled(not installing)
-        for button in self.recommended_install_buttons.values():
-            button.setEnabled((not installing) and self._has_selected_instance())
         self.install_progress.setVisible(installing)
         if installing:
             self.install_progress.setRange(0, 0)
@@ -807,9 +708,6 @@ class PluginPanel(QWidget):
         self.instance_selector.setEnabled(not uninstalling)
         self.plugin_input.setEnabled(not uninstalling)
         self.plugin_tree.setEnabled(not uninstalling)
-        for button in self.recommended_install_buttons.values():
-            button.setEnabled((not uninstalling) and self._has_selected_instance() and self.install_worker is None)
-
         self.uninstall_progress.setVisible(uninstalling)
         if uninstalling:
             self.uninstall_progress.setRange(0, 0)
@@ -825,8 +723,6 @@ class PluginPanel(QWidget):
         self.plugin_input.setPlaceholderText(i18n.t("ph_plugin_name"))
         self.btn_install.setText(i18n.t("btn_install_plugin"))
         self.btn_refresh.setText(i18n.t("btn_refresh"))
-        self.recommended_group.setTitle(i18n.t("section_recommended_plugins"))
-        self._build_recommended_rows()
         self.refresh_plugins()
 
     def shutdown(self):
