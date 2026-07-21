@@ -190,6 +190,8 @@
     "msg_set_default_failed": "设置默认版本失败: {error}",
     "msg_openclaw_update_available": "检测到 OpenClaw 新版本：当前 {current}，最新 {latest}。\n请前往“依赖检查”页面下载并设为默认版本。",
     "msg_default_restart_hint": "若实例正在运行，请重启该实例以应用新的运行时 PATH。",
+    "msg_default_cleared": "已删除的版本原为默认版本，将自动重新选择默认版本。",
+    "msg_delete_runtime_failed": "删除运行时失败: {error}",
     "msg_no_versions": "无可用的版本",
     "status_no_installed": "未安装",
     "header_plugins": "插件管理",

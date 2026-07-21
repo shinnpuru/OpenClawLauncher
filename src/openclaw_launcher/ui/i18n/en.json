@@ -189,6 +189,8 @@
     "msg_set_default_failed": "Failed to set default version: {error}",
     "msg_openclaw_update_available": "A newer OpenClaw version is available: current {current}, latest {latest}.\nPlease go to Dependencies to download it and set it as default.",
     "msg_default_restart_hint": "If an instance is already running, restart it to apply the new runtime PATH.",
+    "msg_default_cleared": "The deleted version was the default. A new default will be selected automatically.",
+    "msg_delete_runtime_failed": "Failed to delete runtime: {error}",
     "msg_no_versions": "No versions available",
     "status_no_installed": "Not Installed",
     "header_plugins": "Plugin Management",

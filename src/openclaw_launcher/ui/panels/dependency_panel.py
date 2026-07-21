@@ -165,8 +165,10 @@ class SoftwareCard(QFrame):
                 
                 btn_del = QPushButton(i18n.t("btn_delete"))
                 # Remove fixed width, let layout handle it or set a minimum
-                btn_del.setMinimumWidth(80) 
-                btn_del.setEnabled(False) # Impl later
+                btn_del.setMinimumWidth(80)
+                btn_del.clicked.connect(
+                    lambda checked=False, s=self.software_key, v=ver['version']: self.parent_panel.delete_version(s, v)
+                )
                 row.addWidget(btn_del)
                 
                 self.content_layout.addWidget(row_widget)
@@ -359,6 +361,33 @@ class DependencyPanel(QWidget):
             self.refresh_all_cards()
         except Exception as err:
             QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_set_default_failed", error=str(err)))
+
+    def delete_version(self, software, version):
+        if self.download_worker:
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_download_busy"))
+            return
+
+        name = f"{software} {version}"
+        confirm = QMessageBox.question(
+            self,
+            i18n.t("title_warning"),
+            i18n.t("msg_confirm_delete", name=name),
+        )
+        if confirm != QMessageBox.Yes:
+            return
+
+        try:
+            was_default = self.runtime_manager.uninstall_version(software, version)
+            message = i18n.t("msg_deleted", name=name)
+            if was_default:
+                message += "\n" + i18n.t("msg_default_cleared")
+            if ProcessManager.has_running_instances():
+                message += "\n" + i18n.t("msg_default_restart_hint")
+            QMessageBox.information(self, i18n.t("title_success"), message)
+            self.refresh_all_cards()
+        except Exception as err:
+            QMessageBox.critical(self, i18n.t("title_error"), i18n.t("msg_delete_runtime_failed", error=str(err)))
+            self.refresh_all_cards()
 
     def on_download_finished(self):
         if self.progress_dialog:

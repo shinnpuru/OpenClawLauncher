@@ -46,9 +46,8 @@ class RuntimeManager:
                 {"version": "3.12.1", "date": "2023-12-08", "tag": "20240107"}
             ],
             self.SOFTWARE_NODE: [
-                {"version": "22.22.1", "date": "2026-03-05"},
-                {"version": "24.14.0", "date": "2026-02-24"},
-                {"version": "25.8.1", "date": "2026-03-11"},
+                {"version": "24.15.0", "date": "2026-03-12"},
+                {"version": "25.9.0", "date": "2026-03-15"},
             ],
             self.SOFTWARE_UV: [
                 {"version": "0.10.10", "date": "2026-03-13"}
@@ -407,6 +406,28 @@ class RuntimeManager:
             raise ValueError(f"{software} {normalized} is not installed")
 
         Config.set_setting(self._runtime_default_key(software), normalized)
+
+    def uninstall_version(self, software: str, version: str) -> bool:
+        """Remove a downloaded runtime from disk.
+
+        Returns True when the deleted version was the configured default
+        (so the caller can inform the user that a new default is auto-selected).
+        """
+        normalized = (version or "").strip()
+        if not normalized:
+            raise ValueError("Version cannot be empty")
+
+        target_dir = self.get_runtime_path(software, normalized)
+        if not target_dir.exists() and not target_dir.is_symlink():
+            raise FileNotFoundError(f"{software} {normalized} is not installed")
+
+        was_default = self.get_configured_default_version(software) == normalized
+        self._delete_path(target_dir)
+
+        if was_default:
+            Config.set_setting(self._runtime_default_key(software), "")
+
+        return was_default
 
     def _find_runtime_npm(self) -> str:
         """Find npm executable from installed Node runtime."""
