@@ -6,77 +6,82 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Platforms](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-555)
+![Platforms](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-555)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 [![Build and Release PyInstaller](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml/badge.svg)](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml)
 
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
+`OpenClaw Launcher` is a PySide6 desktop application that provides a graphical workflow for installing, configuring, and running [OpenClaw](https://github.com/openclaw/openclaw).
+
 ## Key Features
 
-- **One-click Onboarding**: The Onboard panel use one-click setup.
-- **Instance Management**: Create/start/stop/delete instances, with optional pre-update backup, open-folder action, and instance CLI launcher.
-- **Runtime Management**: Manage OpenClaw / Node.js (required) and Python / uv (optional) in Dependencies, including download and default-version switching.
-- **Channel Configuration**: Configure Discord / Telegram / Feishu / DingTalk / QQ credentials per instance in Channels, with stop-before-save safeguards.
-- **Local Model Serving**: Configure and run local GGUF inference in LlamaCPP (port, GPU layers, extra args, API health test).
-- **Model Switching**: Switch instance model providers in Model Switch (OpenAI/DeepSeek/Moonshot/Ollama/Llama.cpp and more) with config automation.
-- **Plugin Management**: Install/uninstall plugins per instance in the Plugins panel, with one-click recommended plugins.
-- **Backup & Restore**: Create zip backups and restore instances; dependency reinstall is attempted after restore.
-- **Log Viewer**: Follow instance logs in-app, clear logs, or open log files with the system default app.
-- **Advanced Settings**: Configure tray behavior, auto-start, update checks, source mirrors, and troubleshooting cleanup actions.
+- **Guided onboarding**: Install the required runtimes, create the default `openclaw` instance, and start it in one click. The Onboard panel also provides start/stop, WebUI, CLI, documentation, and in-place OpenClaw update actions.
+- **Runtime version management**: Download, select, and remove OpenClaw and Node.js versions, plus optional Python and uv versions. The launcher can refresh the available OpenClaw releases and automatically select another default after the current default is removed.
+- **Channel configuration**: Configure Discord, Telegram, Feishu, DingTalk, QQ, and Weixin for each instance. Plugin-backed channels offer an install action when their plugin is missing, and Weixin login opens directly in the instance CLI.
+- **Model switching**: Configure OpenAI-compatible online and local providers—including OpenAI, Moonshot, DeepSeek, Gemini, Grok, GLM, Qwen/DashScope, Doubao, Ollama, llama.cpp, and custom endpoints—and test the API before applying it to an instance.
+- **Local model serving**: Run GGUF models with the bundled llama.cpp server; configure the model, optional multimodal projector, port, GPU layers, and extra arguments, then inspect output and test API connectivity.
+- **Plugin management**: Detect installed plugins and install or uninstall npm plugin packages per instance. If an uninstall leaves files behind, the launcher provides a direct folder shortcut for manual cleanup.
+- **Instance environment variables**: Add, edit, and remove environment variables stored for each instance.
+- **Backup, restore, and logs**: Create zip backups, restore an instance with dependency reinstallation, follow launcher and instance logs, clear a selected log, or open it with the system default application.
+- **Desktop and advanced settings**: Switch between Chinese and English and light/dark/system themes; configure tray behavior, launcher auto-start, minimized startup, automatic instance or llama.cpp startup, update checks, download mirrors, and troubleshooting cleanup actions.
 
 ## Quick Start
 
-### 1) Download
+### 1. Download
 
-Download the installer from the repository [Releases](https://github.com/shinnpuru/OpenClawLauncher/releases) page for your OS (macOS / Linux / Windows).
+Download the latest package from [Releases](https://github.com/shinnpuru/OpenClawLauncher/releases):
 
-### 2) Install
+- Windows x64: Vulkan and CUDA 12.4 builds are available.
+- macOS: Apple Silicon (`arm64`) build.
 
-Install with your platform package:
+### 2. Install
 
-- macOS: put the `.app` package in Application folder and open.
-- Windows: run the `.exe` package.
+- Windows: extract the downloaded archive and run the launcher executable.
+- macOS: extract the archive, move the `.app` to Applications, and open it.
 
-### 3) Use
+### 3. Initialize and run OpenClaw
 
-Start with the **Onboard** panel for first-run initialization. Tutorial: [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)
+Open **Onboard** and click the main one-click button. The launcher downloads the required Node.js and OpenClaw runtimes, creates the default `openclaw` instance, and starts it. The same button starts or stops OpenClaw after initialization.
 
-### 3) Configure and Manage
+Use the shortcuts below it to open WebUI or CLI, update OpenClaw, or visit the official documentation. See the project [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki) for more usage guides.
 
-- Confirm Node.js / OpenClaw (required) and Python / uv (optional) in **Dependencies**.
-- Configure local or online model settings in **LocalLLM** and **Model Switch**.
-- Configure bot channels in **Channels**.
-- Create and run instances in **Instances**, then update version or open folder/CLI when needed.
-- Install required extensions in **Plugins**.
-- Use **Logs** and **Backups** for troubleshooting and data safety.
-- Tune tray behavior, auto-start, mirrors, and cleanup options in **Advanced**.
+### 4. Configure
+
+- Choose runtime versions or remove unused ones in **Dependencies**.
+- Set credentials in **Channels**; install a required channel plugin there when prompted.
+- Choose an online provider in **Model Switch**, or configure a local GGUF model in **LlamaCPP**.
+- Maintain per-instance variables in **Environment Variables** and extensions in **Plugins**.
+- Use **Backups** and **Logs** for data protection and troubleshooting.
+- Adjust startup behavior, mirrors, update checks, and cleanup options in **Advanced**.
 
 <details>
 <summary>Developer Notes</summary>
 
-### Development Environment
+### Requirements
 
 - Python 3.10+
-- Node.js v22+
+- Node.js 22+
+- [uv](https://github.com/astral-sh/uv)
 
-### Run Locally
-
-This project uses [uv](https://github.com/astral-sh/uv):
+### Run locally
 
 ```bash
 uv sync
 uv run python src/openclaw_launcher/main.py
 ```
 
-### Local Packaging (Optional)
+### Build locally
 
 ```bash
-uv add --dev pyinstaller
-uv run pyinstaller --name "OpenClaw Launcher" --windowed --onefile src/openclaw_launcher/main.py
+uv sync --dev
+# Windows
+uv run pyinstaller app.spec
+# macOS
+uv run pyinstaller app-macos.spec
 ```
 
-Output directory: `dist/`
+Build output is written to `dist/`.
 
 </details>
 

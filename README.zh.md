@@ -1,4 +1,3 @@
-
 <p align="center">
 	<img src="teaser.png" alt="OpenClaw Launcher Logo" width="200"/>
 </p>
@@ -7,88 +6,82 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Platforms](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-555)
+![Platforms](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-555)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 [![Build and Release PyInstaller](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml/badge.svg)](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml)
 
 <p align="center">中文 | <a href="README.md">English</a></p>
 
-## 项目目的
-
-`OpenClaw Launcher` 是一个基于 PySide6 的桌面启动器，用于以图形化方式管理 [OpenClaw](https://github.com/openclaw/openclaw) 的安装与运行流程。
-
-它的核心目标是：
-
-- 将原本依赖命令行的安装/启动流程可视化。
-- 降低多实例管理、依赖检查与故障排查的门槛。
-- 提供更清晰的运行状态、日志和备份入口。
+`OpenClaw Launcher` 是一个基于 PySide6 的桌面应用，用图形化流程帮助你安装、配置和运行 [OpenClaw](https://github.com/openclaw/openclaw)。
 
 ## 核心功能
 
-- **一键上手**：首次使用可通过“快速上手”面板一键配置。
-- **实例管理**：创建、启动、停止、删除实例，支持版本更新前自动备份、打开实例目录、启动实例 CLI。
-- **运行时管理**：在“依赖检查”面板中管理 OpenClaw / Node.js（必需）与 Python / uv（可选）版本，支持下载与切换默认版本。
-- **频道配置**：在“频道配置”面板按实例维护 Discord / Telegram / Feishu / DingTalk / QQ 等频道参数，保存时可自动处理实例停止检查。
-- **本地模型服务**：在“LlamaCPP”面板配置并启动本地 GGUF 推理服务，支持端口、GPU 层数、额外参数与 API 连通性测试。
-- **模型切换**：在“模型切换”面板一键切换在线/本地模型提供商（如 OpenAI、DeepSeek、Moonshot、Ollama、Llama.cpp），自动更新实例配置。
-- **插件管理**：在“插件管理”面板按实例安装/卸载插件，支持推荐插件一键安装。
-- **备份与恢复**：将实例打包为 zip 备份并恢复，恢复后自动尝试重装依赖。
-- **日志查看**：按实例实时查看日志、清空日志、用系统默认程序打开日志文件。
-- **高级设置**：支持托盘行为、开机启动、更新检查、源地址配置及故障排除清理工具。
+- **快速上手**：一键安装必需运行时、创建默认的 `openclaw` 实例并启动。快速上手页还提供启动/停止、打开 WebUI、打开 CLI、查看文档和原地更新 OpenClaw 等快捷操作。
+- **运行时版本管理**：下载、选择和删除 OpenClaw 与 Node.js 版本，也可管理可选的 Python 和 uv；支持刷新可用的 OpenClaw 版本，删除当前默认版本后会自动选择新的默认版本。
+- **频道配置**：按实例配置 Discord、Telegram、飞书、钉钉、QQ 和微信。依赖插件的频道若缺少插件，可直接在频道页安装；微信登录可直接打开实例 CLI。
+- **模型切换**：配置兼容 OpenAI API 的在线或本地提供商，包括 OpenAI、Moonshot、DeepSeek、Gemini、Grok、GLM、通义千问/DashScope、豆包、Ollama、llama.cpp 和自定义端点；应用前可测试 API 连通性。
+- **本地模型服务**：使用内置的 llama.cpp 服务运行 GGUF 模型，可设置模型、多模态投影文件、端口、GPU 层数和额外参数，并查看输出及测试 API。
+- **插件管理**：按实例检测已安装插件，通过 npm 包名安装或卸载插件；若卸载后仍有残留文件，可快捷打开对应目录进行手动清理。
+- **实例环境变量**：按实例添加、编辑和删除环境变量。
+- **备份、恢复与日志**：创建 zip 备份，恢复实例并重新安装依赖；实时查看启动器和实例日志、清空选中的日志，或用系统默认程序打开日志文件。
+- **桌面与高级设置**：支持中英文切换以及浅色、深色、跟随系统主题；可配置托盘行为、启动器开机启动、最小化启动、自动启动实例或 llama.cpp、更新检查、下载镜像和故障排除清理操作。
 
 ## 快速开始
 
-### 1) 下载
+### 1. 下载
 
-前往仓库的 [Releases](https://github.com/shinnpuru/OpenClawLauncher/releases) 页面，下载与你系统匹配的安装包（macOS / Windows）。
+前往 [Releases](https://github.com/shinnpuru/OpenClawLauncher/releases) 下载最新安装包：
 
-### 2) 安装
+- Windows x64：提供 Vulkan 和 CUDA 12.4 构建。
+- macOS：提供 Apple Silicon（`arm64`）构建。
 
-按系统提示完成安装：
+### 2. 安装
 
-- macOS：将 `.app` 包放入应用程序文件夹，然后双击打开。
-- Windows：双击运行 `.exe` 包。
+- Windows：解压下载的压缩包，然后运行启动器程序。
+- macOS：解压后将 `.app` 移入“应用程序”文件夹并打开。
 
-### 3) 使用
+### 3. 初始化并运行 OpenClaw
 
-建议先进入“快速上手”面板完成首次初始化。教程详见[Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)。
+进入“快速上手”，点击主操作按钮。启动器会下载必需的 Node.js 和 OpenClaw 运行时、创建默认的 `openclaw` 实例并启动它。初始化完成后，同一个按钮用于启动或停止 OpenClaw。
 
-### 4) 配置与管理
+下方快捷按钮可打开 WebUI 或 CLI、更新 OpenClaw，以及访问官方文档。更多使用说明请参阅项目 [Wiki](https://github.com/shinnpuru/OpenClawLauncher/wiki)。
 
-- 在“依赖检查”面板确认 Node.js / OpenClaw（必需）以及 Python / uv（可选）。
-- 在“本地模型”和“模型切换”面板配置本地或在线模型。
-- 在“频道配置”面板配置机器人频道参数。
-- 在“实例管理”面板创建并启动实例，按需更新版本或打开目录/CLI。
-- 在“插件管理”面板安装所需插件。
-- 在“日志查看”和“备份管理”面板进行运行排查与数据保护。
-- 在“高级设置”面板调整托盘、开机启动、源地址和清理策略。
+### 4. 配置
+
+- 在“依赖检查”中选择运行时版本，或删除不再使用的版本。
+- 在“频道配置”中填写凭据；缺少频道插件时，可按提示直接安装。
+- 在“模型切换”中选择在线提供商，或在“LlamaCPP”中配置本地 GGUF 模型。
+- 在“实例环境变量”和“插件管理”中维护实例变量与扩展。
+- 使用“备份管理”和“日志查看”保护数据、排查问题。
+- 在“高级设置”中调整启动行为、镜像、更新检查和清理选项。
 
 <details>
 <summary>开发者说明</summary>
 
-### 开发环境
+### 环境要求
 
 - Python 3.10+
-- Node.js v22+
+- Node.js 22+
+- [uv](https://github.com/astral-sh/uv)
 
 ### 本地运行
-
-本项目使用 [uv](https://github.com/astral-sh/uv) 管理依赖：
 
 ```bash
 uv sync
 uv run python src/openclaw_launcher/main.py
 ```
 
-### 本地打包
+### 本地构建
 
 ```bash
-uv add --dev pyinstaller
+uv sync --dev
+# Windows
 uv run pyinstaller app.spec
-# uv run pyinstaller app-macos.spec
+# macOS
+uv run pyinstaller app-macos.spec
 ```
 
-输出目录：`dist/`
+构建产物位于 `dist/`。
 
 </details>
 
