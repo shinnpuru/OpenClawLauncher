@@ -284,7 +284,13 @@ class InstallManager:
 
         if instance_path:
             resolved_instance_name = instance_name or instance_path.name
+            state_dir = instance_path / ".openclaw"
             env["OPENCLAW_HOME"] = str(instance_path)
+            # Pin newer OpenClaw releases to the launcher's existing per-instance
+            # state. A named profile otherwise derives a sibling
+            # `.openclaw-<profile>` directory and splits config/session data.
+            env["OPENCLAW_STATE_DIR"] = str(state_dir)
+            env["OPENCLAW_CONFIG_PATH"] = str(state_dir / "openclaw.json")
             env["OPENCLAW_GATEWAY_TOKEN"] = cls.get_instance_gateway_token(
                 instance_path,
                 resolved_instance_name,
@@ -572,7 +578,16 @@ class InstallManager:
         env = cls.get_runtime_env(instance_path=instance_path, instance_name=instance_name)
 
         logger.info(f"Installing dependencies in {instance_path}")
-        cls._run_npm(instance_path, ["install", "--omit=dev"], env, log_stream=log_stream)
+        # OpenClaw 2026.8.2+ contains optional peer constraints in its development
+        # dependency graph that npm cannot resolve even when dev dependencies are
+        # omitted. They do not affect the production install, so keep npm from
+        # rejecting the otherwise valid dependency tree.
+        cls._run_npm(
+            instance_path,
+            ["install", "--omit=dev", "--legacy-peer-deps"],
+            env,
+            log_stream=log_stream,
+        )
 
     @classmethod
     def apply_windows_a2ui_patch(cls, instance_path: Path, log_stream: Optional[TextIO] = None):
