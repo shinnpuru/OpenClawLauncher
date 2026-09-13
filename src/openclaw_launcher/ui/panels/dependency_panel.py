@@ -411,6 +411,7 @@ class DependencyPanel(QWidget):
 
     def refresh_all_cards(self, force_remote_refresh: bool = False):
         if force_remote_refresh:
+            self.runtime_manager.refresh_available_versions(RuntimeManager.SOFTWARE_NODE)
             self.runtime_manager.refresh_available_versions(RuntimeManager.SOFTWARE_OPENCLAW)
         self._update_openclaw_last_refresh_text()
         for card in self.cards:

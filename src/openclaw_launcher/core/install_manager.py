@@ -100,7 +100,7 @@ class InstallManager:
             version
             for item in installed
             for version in [item.get("version")]
-            if isinstance(version, str) and version
+            if isinstance(version, str) and rm.is_supported_node_version(version)
         ]
         if not versions:
             return None
@@ -140,15 +140,19 @@ class InstallManager:
         current = cls._get_best_installed_node_version(rm)
 
         if current and cls._version_gte(current, required):
+            configured = rm.get_default_version(RuntimeManager.SOFTWARE_NODE)
+            if not configured or not rm.is_supported_node_version(configured) or not cls._version_gte(configured, required):
+                rm.set_default_version(RuntimeManager.SOFTWARE_NODE, current)
             return
 
+        rm.refresh_available_versions(RuntimeManager.SOFTWARE_NODE)
         available = rm.get_available_versions(RuntimeManager.SOFTWARE_NODE)
         candidates: list[str] = sorted(
             [
                 version
                 for item in available
                 for version in [item.get("version")]
-                if isinstance(version, str) and version
+                if isinstance(version, str) and rm.is_supported_node_version(version)
             ],
             key=cls._parse_semver,
             reverse=True,
@@ -160,6 +164,7 @@ class InstallManager:
 
         logger.info(f"Installing Node runtime {target} (required >= {required})")
         rm.install_version(RuntimeManager.SOFTWARE_NODE, target)
+        rm.set_default_version(RuntimeManager.SOFTWARE_NODE, target)
 
     @classmethod
     def _ensure_runtime_node_wrappers(cls, instance_path: Path, node_bin_dir: Path) -> Optional[Path]:
@@ -1004,6 +1009,7 @@ class InstallManager:
                 cls.apply_windows_a2ui_patch(current_path, log_stream=log_file)
             
             # Reinstall dependencies
+            cls.ensure_node_runtime(current_path)
             cls.install_dependencies(current_path, instance_name, log_stream=log_file)
 
             log_file.write("===== Instance update completed =====\n")

@@ -32,6 +32,8 @@ class RuntimeManager:
     SOFTWARE_OPENCLAW = "openclaw"
     OPENCLAW_VERSIONS_CONFIG_KEY = "openclaw_available_versions"
     OPENCLAW_VERSIONS_REFRESHED_AT_CONFIG_KEY = "openclaw_available_versions_refreshed_at"
+    NODE_VERSIONS_CONFIG_KEY = "node_available_versions"
+    NODE_VERSIONS_REFRESHED_AT_CONFIG_KEY = "node_available_versions_refreshed_at"
 
     def __init__(self):
         self.ensure_dirs()
@@ -46,8 +48,7 @@ class RuntimeManager:
                 {"version": "3.12.1", "date": "2023-12-08", "tag": "20240107"}
             ],
             self.SOFTWARE_NODE: [
-                {"version": "24.15.0", "date": "2026-03-12"},
-                {"version": "25.9.0", "date": "2026-03-15"},
+                {"version": "24.16.0", "date": "2026-05-21"},
             ],
             self.SOFTWARE_UV: [
                 {"version": "0.10.10", "date": "2026-03-13"}
@@ -56,6 +57,12 @@ class RuntimeManager:
         }
 
         self._remote_versions_cache[self.SOFTWARE_OPENCLAW] = self._load_cached_openclaw_versions()
+        self._remote_versions_cache[self.SOFTWARE_NODE] = self._normalize_node_versions(
+            Config.get_setting(self.NODE_VERSIONS_CONFIG_KEY, [])
+        )
+        node_refreshed_at = Config.get_setting(self.NODE_VERSIONS_REFRESHED_AT_CONFIG_KEY, "")
+        if isinstance(node_refreshed_at, str) and node_refreshed_at.strip():
+            self._remote_versions_refreshed_at[self.SOFTWARE_NODE] = node_refreshed_at.strip()
         refreshed_at = Config.get_setting(self.OPENCLAW_VERSIONS_REFRESHED_AT_CONFIG_KEY, "")
         if isinstance(refreshed_at, str):
             refreshed_at = refreshed_at.strip()
@@ -465,7 +472,67 @@ class RuntimeManager:
 
         return None
 
+    @staticmethod
+    def is_supported_node_version(version: str) -> bool:
+        """OpenClaw requires >=24.16.0 <25 || >=26.1.0; exclude prereleases."""
+        match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", str(version))
+        if not match:
+            return False
+        parsed = tuple(map(int, match.groups()))
+        return (24, 16, 0) <= parsed < (25, 0, 0) or parsed >= (26, 1, 0)
+
+    def _normalize_node_versions(self, payload) -> List[Dict]:
+        if not isinstance(payload, list):
+            return []
+        versions = {}
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            version = str(item.get("version", "")).removeprefix("v")
+            if self.is_supported_node_version(version):
+                versions[version] = {"version": version, "date": str(item.get("date", "Unknown"))}
+        return sorted(versions.values(), key=lambda item: self._natural_version_key(item["version"]), reverse=True)
+
+    def _fetch_node_versions(self) -> List[Dict]:
+        bases = [self._get_node_mirror(), "https://nodejs.org/dist"]
+        for base in dict.fromkeys(base for base in bases if base):
+            try:
+                request = urllib.request.Request(
+                    f"{base}/index.json", headers={"User-Agent": "OpenClawLauncher/1.0"}
+                )
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    versions = self._normalize_node_versions(json.loads(response.read().decode("utf-8")))
+                if versions:
+                    return versions
+            except Exception as error:
+                logger.warning("Failed to fetch Node.js versions from %s: %s", base, error)
+        return []
+
+    def ensure_latest_node_runtime(self, callback=None) -> str:
+        """Refresh, install and select the newest compatible stable Node.js."""
+        self.refresh_available_versions(self.SOFTWARE_NODE)
+        candidates = {item["version"] for item in self.get_available_versions(self.SOFTWARE_NODE)}
+        candidates.update(
+            item["version"] for item in self.get_installed_versions(self.SOFTWARE_NODE)
+            if self.is_supported_node_version(item["version"])
+        )
+        target = max(candidates, key=self._natural_version_key)
+        self.install_version(self.SOFTWARE_NODE, target, callback=callback)
+        self.set_default_version(self.SOFTWARE_NODE, target)
+        return target
+
     def refresh_available_versions(self, software: str):
+        if software == self.SOFTWARE_NODE:
+            versions = self._fetch_node_versions()
+            if versions:
+                self._remote_versions_cache[software] = versions
+                refreshed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self._remote_versions_refreshed_at[software] = refreshed_at
+                Config.set_setting(self.NODE_VERSIONS_CONFIG_KEY, versions)
+                Config.set_setting(self.NODE_VERSIONS_REFRESHED_AT_CONFIG_KEY, refreshed_at)
+            else:
+                logger.warning("Node.js versions refresh failed; keeping cached or bundled versions")
+            return
         if software != self.SOFTWARE_OPENCLAW:
             return
 
@@ -485,6 +552,8 @@ class RuntimeManager:
         return value if value else None
 
     def get_available_versions(self, software: str) -> List[Dict]:
+        if software == self.SOFTWARE_NODE:
+            return list(self._remote_versions_cache.get(software) or self._available_versions[software])
         if software == self.SOFTWARE_OPENCLAW:
             cached = self._remote_versions_cache.get(software, [])
             return list(cached)

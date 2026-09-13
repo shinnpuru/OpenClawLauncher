@@ -69,19 +69,12 @@ class InstallDependenciesWorker(QThread):
                     pass
 
             # Node.js runtime
-            if not manager.get_default_version(RuntimeManager.SOFTWARE_NODE):
-                node_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_NODE)
-                if not node_versions:
-                    raise RuntimeError("No available Node.js versions")
-
-                node_target = str(node_versions[0]["version"])
-                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_node"), version=node_target)
-                self.progress.emit(msg)
-                _write_log(msg)
-                self.progress_percentage.emit(25)
-                manager.install_version(RuntimeManager.SOFTWARE_NODE, node_target)
-                self.progress_percentage.emit(50)
-                manager.set_default_version(RuntimeManager.SOFTWARE_NODE, node_target)
+            msg = i18n.t("onboard_status_refresh_node")
+            self.progress.emit(msg)
+            _write_log(msg)
+            self.progress_percentage.emit(25)
+            manager.ensure_latest_node_runtime()
+            self.progress_percentage.emit(50)
 
             # OpenClaw runtime
             if not manager.get_default_version(RuntimeManager.SOFTWARE_OPENCLAW):
@@ -155,6 +148,9 @@ class UpdateOpenClawWorker(QThread):
 
     def run(self):
         try:
+            self.progress.emit(i18n.t("onboard_status_refresh_node"))
+            RuntimeManager().ensure_latest_node_runtime()
+
             def _progress_callback(stage: str, current: int, total: int, detail: str):
                 """Handle progress updates from InstallManager."""
                 if stage == "overwriting":
@@ -208,19 +204,12 @@ class OneClickWorker(QThread):
             if self.isInterruptionRequested():
                 raise RuntimeError("Interrupted")
 
-            if not manager.get_default_version(RuntimeManager.SOFTWARE_NODE):
-                node_versions = manager.get_available_versions(RuntimeManager.SOFTWARE_NODE)
-                if not node_versions:
-                    raise RuntimeError("No available Node.js versions")
-
-                node_target = str(node_versions[0]["version"])
-                msg = i18n.t("onboard_status_installing_dep", name=i18n.t("runtime_node"), version=node_target)
-                self.progress.emit(msg)
-                _write_log(msg)
-                self.progress_percentage.emit(20)
-                manager.install_version(RuntimeManager.SOFTWARE_NODE, node_target)
-                self.progress_percentage.emit(40)
-                manager.set_default_version(RuntimeManager.SOFTWARE_NODE, node_target)
+            msg = i18n.t("onboard_status_refresh_node")
+            self.progress.emit(msg)
+            _write_log(msg)
+            self.progress_percentage.emit(20)
+            manager.ensure_latest_node_runtime()
+            self.progress_percentage.emit(40)
 
             if self.isInterruptionRequested():
                 raise RuntimeError("Interrupted")
@@ -285,6 +274,7 @@ class OnboardPanel(QWidget):
         super().__init__()
         self.dep_worker = None
         self.sample_worker = None
+        self.update_worker = None
 
         worker = getattr(self, "one_click_worker", None)
         if worker and worker.isRunning():
@@ -367,15 +357,15 @@ class OnboardPanel(QWidget):
         self.btn_webui_link.clicked.connect(self.open_sample_webui)
         self.btn_cli_launcher = QPushButton(i18n.t("onboard_btn_open_cli"))
         self.btn_cli_launcher.clicked.connect(self.open_sample_cli)
+        self.btn_open_folder = QPushButton(i18n.t("btn_open_folder"))
+        self.btn_open_folder.clicked.connect(self.open_sample_folder)
         self.btn_update_version = QPushButton(i18n.t("btn_update_version"))
         self.btn_update_version.clicked.connect(self.update_openclaw_version)
-        self.btn_docs = QPushButton(i18n.t("onboard_btn_open_docs"))
-        self.btn_docs.clicked.connect(lambda: self.open_url("https://docs.openclaw.ai"))
 
         links_layout.addWidget(self.btn_webui_link)
         links_layout.addWidget(self.btn_cli_launcher)
+        links_layout.addWidget(self.btn_open_folder)
         links_layout.addWidget(self.btn_update_version)
-        links_layout.addWidget(self.btn_docs)
         self.layout.addLayout(links_layout)
 
         self.layout.addSpacing(10)
@@ -423,6 +413,17 @@ class OnboardPanel(QWidget):
         deps_done = self._dependencies_ok()
         sample_done = self._sample_ok()
         running_done = self._sample_running()
+
+        # Instance directories exist before installation finishes. Keep actions
+        # disabled until the installation callbacks have cleared their workers.
+        installing = any(worker is not None for worker in (
+            self.dep_worker, self.sample_worker, self.one_click_worker
+        ))
+        installed = deps_done and sample_done and not installing
+        self.btn_webui_link.setEnabled(installed)
+        self.btn_cli_launcher.setEnabled(installed)
+        self.btn_open_folder.setEnabled(installed)
+        self.btn_update_version.setEnabled(installed and self.update_worker is None)
 
         if self.one_click_worker and self.one_click_worker.isRunning():
             self.btn_one_click.setEnabled(True)
@@ -653,6 +654,19 @@ class OnboardPanel(QWidget):
         except Exception as e:
             QMessageBox.critical(self, i18n.t("title_error"), i18n.t("onboard_msg_cli_open_failed", error=str(e)))
 
+    def open_sample_folder(self):
+        if not self._sample_ok():
+            QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_instance_not_found"))
+            self.refresh_status()
+            return
+
+        openclaw_folder = Config.get_instance_path(self.SAMPLE_INSTANCE_NAME) / ".openclaw"
+        openclaw_folder.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(openclaw_folder)))
+        self.lbl_status.setText(i18n.t(
+            "msg_open_folder", name=self.SAMPLE_INSTANCE_NAME, path=str(openclaw_folder)
+        ))
+
     def open_url(self, url: str):
         QDesktopServices.openUrl(QUrl(url))
 
@@ -720,7 +734,6 @@ class OnboardPanel(QWidget):
     def on_update_finished(self):
         self.update_worker = None
         self.progress_main.setVisible(False)
-        self.btn_update_version.setEnabled(True)
         QMessageBox.information(
             self,
             i18n.t("title_success"),
@@ -731,7 +744,6 @@ class OnboardPanel(QWidget):
     def on_update_error(self, error: str):
         self.update_worker = None
         self.progress_main.setVisible(False)
-        self.btn_update_version.setEnabled(True)
         QMessageBox.critical(
             self,
             i18n.t("title_error"),
@@ -743,8 +755,8 @@ class OnboardPanel(QWidget):
         self.lbl_title.setText(i18n.t("onboard_title"))
         self.btn_webui_link.setText(i18n.t("onboard_btn_open_webui"))
         self.btn_cli_launcher.setText(i18n.t("onboard_btn_open_cli"))
+        self.btn_open_folder.setText(i18n.t("btn_open_folder"))
         self.btn_update_version.setText(i18n.t("btn_update_version"))
-        self.btn_docs.setText(i18n.t("onboard_btn_open_docs"))
         self.btn_one_click.setText(self.btn_one_click.text())
         self.refresh_status()
 

@@ -295,6 +295,7 @@
     "onboard_hint_configure_before_start": "实例已创建，建议先配置模型和频道，再启动。",
     "onboard_hint_start_instance": "实例已创建，下一步启动实例。",
     "onboard_status_refresh_openclaw": "正在拉取 OpenClaw 可用版本...",
+    "onboard_status_refresh_node": "正在检查并更新 Node.js 至最新兼容版本...",
     "onboard_status_installing_dep": "正在安装 {name} {version}...",
     "onboard_status_creating_sample": "正在创建实例 {name}（首次可能较慢）...",
     "onboard_msg_dependencies_done": "依赖安装完成。",

@@ -294,6 +294,7 @@
     "onboard_hint_configure_before_start": "Instance is created. Recommended: configure model and channels first.",
     "onboard_hint_start_instance": "instance is created. Next step: start the instance.",
     "onboard_status_refresh_openclaw": "Refreshing OpenClaw versions...",
+    "onboard_status_refresh_node": "Checking and updating Node.js to the latest compatible version...",
     "onboard_status_installing_dep": "Installing {name} {version}...",
     "onboard_status_creating_sample": "Creating instance {name} (first run may take longer)...",
     "onboard_msg_dependencies_done": "Dependencies installed.",
