@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 env:
-  LLAMA_CPP_TAG: b8235
+  LLAMA_CPP_TAG: b10938
 
 jobs:
   build:
