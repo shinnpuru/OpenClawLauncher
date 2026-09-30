@@ -1,572 +1,152 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OpenClaw Launcher | 本地 OpenClaw + 本地 LLM 一键部署</title>
-  <meta name="description" content="OpenClaw Launcher 是基于 PySide6 的桌面启动器，提供引导式上手、多实例管理、依赖检查、模型切换、日志与备份恢复。" />
-  <link rel="icon" href="./icon.ico" type="image/x-icon" />
-  <style>
-    :root {
-      /* Claude Design System - Warm Palette */
-      --parchment: #f5f4ed;
-      --ivory: #faf9f5;
-      --pure-white: #ffffff;
-      --warm-sand: #e8e6dc;
-      --border-cream: #f0eee6;
-      --border-warm: #e8e6dc;
-      
-      --near-black: #141413;
-      --dark-surface: #30302e;
-      --deep-dark: #141413;
-      
-      --charcoal-warm: #4d4c48;
-      --olive-gray: #5e5d59;
-      --stone-gray: #87867f;
-      --dark-warm: #3d3d3a;
-      --warm-silver: #b0aea5;
-      
-      --terracotta: #c96442;
-      --coral: #d97757;
-      --ring-warm: #d1cfc5;
-      --ring-deep: #c2c0b6;
-      
-      --focus-blue: #3898ec;
-      
-      /* Typography */
-      --font-serif: Georgia, "Times New Roman", serif;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      
-      /* Shadows */
-      --shadow-ring: 0px 0px 0px 1px var(--ring-warm);
-      --shadow-ring-deep: 0px 0px 0px 1px var(--ring-deep);
-      --shadow-whisper: rgba(0,0,0,0.05) 0px 4px 24px;
-    }
-
-    * { box-sizing: border-box; }
-
-    html, body { margin: 0; padding: 0; }
-
-    body {
-      font-family: var(--font-sans);
-      background: var(--parchment);
-      color: var(--near-black);
-      line-height: 1.60;
-      font-size: 16px;
-    }
-
-    /* Typography Hierarchy */
-    h1, h2, h3 {
-      font-family: var(--font-serif);
-      font-weight: 500;
-      margin: 0;
-    }
-
-    h1 {
-      font-size: clamp(36px, 4vw, 64px);
-      line-height: 1.10;
-      color: var(--near-black);
-    }
-
-    h2 {
-      font-size: clamp(28px, 3vw, 52px);
-      line-height: 1.20;
-      color: var(--near-black);
-    }
-
-    h3 {
-      font-size: 25px;
-      line-height: 1.20;
-      color: var(--near-black);
-    }
-
-    .container {
-      width: min(1200px, 92vw);
-      margin: 0 auto;
-    }
-
-    /* Navigation */
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: color-mix(in srgb, var(--parchment) 95%, transparent);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--border-cream);
-    }
-
-    .topbar-inner {
-      min-height: 72px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-      color: var(--near-black);
-      font-family: var(--font-sans);
-      font-weight: 500;
-      font-size: 17px;
-      letter-spacing: normal;
-    }
-
-    .brand img {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid var(--border-cream);
-      background: var(--ivory);
-      padding: 3px;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .icon-btn {
-      border: 1px solid var(--border-warm);
-      background: var(--warm-sand);
-      color: var(--charcoal-warm);
-      border-radius: 8px;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-family: var(--font-sans);
-      font-weight: 500;
-      font-size: 14px;
-      box-shadow: 0px 0px 0px 0px var(--warm-sand), 0px 0px 0px 1px var(--ring-warm);
-      transition: all 0.15s ease;
-    }
-
-    .icon-btn:hover {
-      background: var(--border-cream);
-      box-shadow: 0px 0px 0px 1px var(--ring-deep);
-    }
-
-    /* Hero Section */
-    .hero {
-      padding: 80px 0 60px;
-    }
-
-    .hero-card {
-      background: var(--ivory);
-      border: 1px solid var(--border-cream);
-      border-radius: 32px;
-      padding: 48px;
-      box-shadow: var(--shadow-whisper);
-    }
-
-    .subtitle {
-      margin: 16px 0 0;
-      font-size: 20px;
-      line-height: 1.60;
-      color: var(--olive-gray);
-      font-family: var(--font-sans);
-      max-width: 760px;
-    }
-
-    .badge-row,
-    .chips,
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .chips {
-      margin: 24px 0 28px;
-    }
-
-    .chip {
-      border-radius: 999px;
-      border: 1px solid var(--border-warm);
-      background: var(--parchment);
-      padding: 6px 14px;
-      font-size: 14px;
-      color: var(--olive-gray);
-      font-family: var(--font-sans);
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-      border-radius: 12px;
-      font-family: var(--font-sans);
-      font-weight: 500;
-      font-size: 16px;
-      transition: all 0.15s ease;
-      cursor: pointer;
-      border: none;
-    }
-
-    .btn-primary {
-      color: var(--ivory);
-      background: var(--terracotta);
-      padding: 12px 20px;
-      box-shadow: 0px 0px 0px 0px var(--terracotta), 0px 0px 0px 1px var(--terracotta);
-    }
-
-    .btn-primary:hover {
-      background: var(--coral);
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      color: var(--charcoal-warm);
-      background: var(--warm-sand);
-      padding: 12px 20px;
-      box-shadow: 0px 0px 0px 0px var(--warm-sand), 0px 0px 0px 1px var(--ring-warm);
-    }
-
-    .btn-secondary:hover {
-      background: var(--border-cream);
-      box-shadow: 0px 0px 0px 1px var(--ring-deep);
-    }
-
-    .btn-outline {
-      color: var(--near-black);
-      background: var(--pure-white);
-      padding: 12px 20px;
-      border: 1px solid var(--border-cream);
-    }
-
-    .btn-outline:hover {
-      background: var(--ivory);
-      box-shadow: 0px 0px 0px 1px var(--ring-warm);
-    }
-
-    /* Sections */
-    .section {
-      padding: 60px 0;
-    }
-
-    .section-header {
-      margin-bottom: 32px;
-    }
-
-    .section .desc {
-      margin: 12px 0 0;
-      font-size: 17px;
-      line-height: 1.60;
-      color: var(--olive-gray);
-      font-family: var(--font-sans);
-      max-width: 760px;
-    }
-
-    /* Grids */
-    .grid-3,
-    .grid-2,
-    .shot-grid {
-      display: grid;
-      gap: 20px;
-    }
-
-    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .shot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-    /* Cards */
-    .card {
-      background: var(--ivory);
-      border: 1px solid var(--border-cream);
-      border-radius: 16px;
-      padding: 28px;
-      box-shadow: var(--shadow-whisper);
-      transition: all 0.15s ease;
-    }
-
-    .card:hover {
-      box-shadow: var(--shadow-whisper), 0px 0px 0px 1px var(--ring-warm);
-    }
-
-    .card h3 {
-      font-size: 20px;
-      margin-bottom: 10px;
-    }
-
-    .card p {
-      margin: 0;
-      color: var(--olive-gray);
-      font-size: 15px;
-      line-height: 1.60;
-      font-family: var(--font-sans);
-    }
-
-    /* Ordered Lists */
-    .ol {
-      margin: 0;
-      padding-left: 22px;
-      color: var(--olive-gray);
-      font-family: var(--font-sans);
-      font-size: 15px;
-      line-height: 1.60;
-    }
-
-    .ol li { padding-left: 4px; }
-    .ol li + li { margin-top: 10px; }
-
-    /* Screenshots */
-    .shot {
-      overflow: hidden;
-      border-radius: 16px;
-      border: 1px solid var(--border-cream);
-      background: var(--ivory);
-      box-shadow: var(--shadow-whisper);
-      transition: all 0.15s ease;
-    }
-
-    .shot:hover {
-      box-shadow: var(--shadow-whisper), 0px 0px 0px 1px var(--ring-warm);
-    }
-
-    .shot img {
-      width: 100%;
-      height: 180px;
-      object-fit: cover;
-      display: block;
-      border-bottom: 1px solid var(--border-cream);
-    }
-
-    .shot p {
-      margin: 0;
-      padding: 12px 16px;
-      font-size: 14px;
-      color: var(--olive-gray);
-      font-family: var(--font-sans);
-      background: var(--ivory);
-    }
-
-    /* Dark Section */
-    .section-dark {
-      background: var(--deep-dark);
-      margin: 60px 0;
-      padding: 80px 0;
-    }
-
-    .section-dark h2 {
-      color: var(--ivory);
-    }
-
-    .section-dark .desc {
-      color: var(--warm-silver);
-    }
-
-    .section-dark .card {
-      background: var(--dark-surface);
-      border-color: var(--dark-surface);
-    }
-
-    .section-dark .card h3 {
-      color: var(--ivory);
-    }
-
-    .section-dark .card p,
-    .section-dark .ol {
-      color: var(--warm-silver);
-    }
-
-    .section-dark .btn-secondary {
-      background: var(--dark-surface);
-      color: var(--warm-silver);
-      border: 1px solid var(--dark-surface);
-      box-shadow: none;
-    }
-
-    .section-dark .btn-secondary:hover {
-      background: var(--charcoal-warm);
-      color: var(--ivory);
-    }
-
-    /* Footer */
-    footer {
-      padding: 40px 0 60px;
-      text-align: center;
-      color: var(--stone-gray);
-      font-size: 14px;
-      font-family: var(--font-sans);
-      border-top: 1px solid var(--border-cream);
-      margin-top: 40px;
-    }
-
-    /* Responsive */
-    @media (max-width: 980px) {
-      .grid-3, .shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .grid-2 { grid-template-columns: 1fr; }
-      .hero { padding: 60px 0 40px; }
-      .hero-card { padding: 36px; }
-    }
-
-    @media (max-width: 640px) {
-      .hero-card { padding: 28px; border-radius: 24px; }
-      .grid-3, .shot-grid { grid-template-columns: 1fr; }
-      h1 { font-size: clamp(28px, 9vw, 36px); }
-      h2 { font-size: clamp(24px, 7vw, 32px); }
-      .card { padding: 22px; }
-      .section { padding: 40px 0; }
-      .section-dark { padding: 60px 0; }
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>OpenClaw Launcher — 让 OpenClaw，轻松在桌面运行</title>
+  <meta name="description" content="OpenClaw Launcher 是免费开源的 OpenClaw 桌面启动器。一键安装与启动，连接聊天频道，配置在线或本地模型，管理插件、日志和备份。支持 macOS 与 Windows。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OpenClaw Launcher — 让 OpenClaw，轻松在桌面运行">
+  <meta property="og:description" content="从安装、配置到日常管理，把 OpenClaw 的复杂步骤交给一个桌面应用。免费开源，支持 macOS 与 Windows。">
+  <meta property="og:url" content="https://openclaw.shinnpuru.site/">
+  <meta property="og:image" content="https://openclaw.shinnpuru.site/assets/models.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://openclaw.shinnpuru.site/">
+  <link rel="icon" href="./icon.ico" sizes="any">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./script.js" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="container topbar-inner">
-      <a class="brand" href="https://github.com/shinnpuru/OpenClawLauncher" target="_blank" rel="noopener noreferrer">
-        <img src="./assets/logo.png" alt="OpenClaw Launcher Logo" />
-        <span>OpenClaw Launcher</span>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="header">
+    <div class="header-inner">
+      <a class="brand" href="#" aria-label="OpenClaw Launcher 首页">
+        <img src="./assets/logo.png" alt="" width="30" height="30">
+        <span>OpenClaw <span class="brand-light">Launcher</span></span>
       </a>
-      <nav class="nav-links">
-        <a class="btn btn-secondary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">下载</a>
-        <a class="btn btn-outline" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">文档</a>
+      <nav class="navigation" aria-label="主导航">
+        <a href="#features">功能</a>
+        <a href="#interface">界面</a>
+        <a href="#start">快速开始</a>
+        <a href="https://github.com/shinnpuru/OpenClawLauncher/wiki">文档 <span aria-hidden="true">↗</span></a>
       </nav>
+      <a class="button button-small" href="#download">下载 <span aria-hidden="true">↓</span></a>
     </div>
   </header>
-
-  <main>
-    <section class="hero">
-      <div class="container">
-        <article class="hero-card">
-          <h1>本地 OpenClaw + 本地 LLM，一键可视化部署</h1>
-          <p class="subtitle">围绕本地化部署场景，从依赖准备、实例管理到 LlamaCPP 与模型切换，全流程图形化可控。</p>
-          <div class="chips">
-            <span class="chip">macOS / Windows</span>
-            <span class="chip">MIT License</span>
-            <span class="chip">PySide6</span>
-          </div>
-          <div class="cta-row">
-            <a class="btn btn-primary" href="https://github.com/shinnpuru/OpenClawLauncher/releases" target="_blank" rel="noopener noreferrer">
-              <span>进入 Releases</span>
-            </a>
-            <a class="btn btn-secondary" href="https://github.com/shinnpuru/OpenClawLauncher/wiki" target="_blank" rel="noopener noreferrer">
-              <span>查看 Wiki</span>
-            </a>
-          </div>
+  <main id="main">
+    <section class="hero container" aria-labelledby="hero-title">
+      <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OPENCLAW 的桌面启动器</p>
+      <h1 id="hero-title">让 OpenClaw，<br>轻松在桌面运行。</h1>
+      <p class="hero-description">从安装、配置到日常管理，<br class="mobile-break">把复杂步骤交给一个桌面应用。</p>
+      <div class="hero-actions">
+        <a class="button" href="#download">免费下载 <span aria-hidden="true">↓</span></a>
+        <a class="text-link" href="https://github.com/shinnpuru/OpenClawLauncher">在 GitHub 上查看 <span aria-hidden="true">↗</span></a>
+      </div>
+      <p class="hero-meta">macOS & Windows <span aria-hidden="true">·</span> 免费开源 <span aria-hidden="true">·</span> MIT License</p>
+    </section>
+    <section class="showcase container" id="interface" aria-labelledby="interface-title">
+      <div class="section-heading showcase-heading">
+        <div><p class="eyebrow">一个界面，井然有序</p><h2 id="interface-title">少一点配置，<br>多一点可能。</h2></div>
+        <p class="section-description">启动 OpenClaw、连接聊天频道、选择模型。<br>你需要的控制，都在这里。</p>
+      </div>
+      <div class="tab-list" role="tablist" aria-label="应用界面预览">
+        <button role="tab" id="tab-onboard" aria-controls="preview-panel" aria-selected="true" data-view="onboard">一键启动</button>
+        <button role="tab" id="tab-models" aria-controls="preview-panel" aria-selected="false" tabindex="-1" data-view="models">模型切换</button>
+        <button role="tab" id="tab-channels" aria-controls="preview-panel" aria-selected="false" tabindex="-1" data-view="channels">频道接入</button>
+        <button role="tab" id="tab-llamacpp" aria-controls="preview-panel" aria-selected="false" tabindex="-1" data-view="llamacpp">本地模型</button>
+        <button role="tab" id="tab-plugin" aria-controls="preview-panel" aria-selected="false" tabindex="-1" data-view="plugin">插件管理</button>
+        <button role="tab" id="tab-backup" aria-controls="preview-panel" aria-selected="false" tabindex="-1" data-view="backup">备份恢复</button>
+      </div>
+      <div class="preview-panel" id="preview-panel" role="tabpanel" aria-labelledby="tab-onboard" tabindex="0">
+        <div class="preview-stage">
+          <a class="preview-image-link" id="preview-image-link" href="./assets/onboard.png" aria-label="放大快速上手界面截图">
+            <img id="preview-image" src="./assets/onboard.png" alt="新版 OpenClaw Launcher 快速上手界面，提供一键安装并启动按钮和功能侧边栏" width="2400" height="1700" fetchpriority="high">
+            <span class="zoom-hint" aria-hidden="true">查看大图 ↗</span>
+          </a>
+        </div>
+        <div class="preview-caption" aria-live="polite">
+          <p><span id="preview-title">从第一次启动开始，就很简单。</span><span id="preview-description">自动准备运行时、创建默认实例并启动 OpenClaw。</span></p>
+          <span class="preview-count" id="preview-count" aria-label="第 1 张，共 6 张">01 / 06</span>
+        </div>
+      </div>
+      <noscript><p class="noscript-note">更多界面：<a href="./assets/models.png">模型切换</a> · <a href="./assets/channels.png">频道接入</a> · <a href="./assets/llamacpp.png">本地模型</a> · <a href="./assets/plugin.png">插件管理</a> · <a href="./assets/backup.png">备份恢复</a></p></noscript>
+    </section>
+    <section class="features container section" id="features" aria-labelledby="features-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">为日常使用而设计</p><h2 id="features-title">从开始，到得心应手。</h2></div>
+        <p class="section-description">第一次使用有引导，<br>每一天使用有掌控。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m18 3-11 15h8l-1 11 11-16h-8l1-10Z" stroke-linejoin="round"/></svg>
+          <h3>一键安装与启动</h3><p>自动准备 Node.js 和 OpenClaw，创建默认实例。安装完成后，同一个按钮即可启动或停止。</p><span class="feature-note">WebUI 与 CLI，随手打开</span>
+        </article>
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="5" width="24" height="16" rx="4"/><path d="m10 21-3 6 10-6M10 11h12M10 15h8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>连接熟悉的聊天工具</h3><p>在一个面板配置 Discord、Telegram、飞书、钉钉、QQ 和微信。缺少频道插件时，可直接安装。</p><span class="feature-note">按实例管理频道配置</span>
+        </article>
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 9h22M5 23h22" stroke-linecap="round"/><circle cx="12" cy="9" r="4" fill="white"/><circle cx="21" cy="23" r="4" fill="white"/></svg>
+          <h3>模型，由你选择</h3><p>连接 OpenAI、DeepSeek、Moonshot 等在线服务，或使用 Ollama 和自定义 API。应用配置前可测试连通性。</p><span class="feature-note">在线与本地提供商，自由切换</span>
+        </article>
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4" y="5" width="24" height="17" rx="2"/><path d="M16 22v5M10 27h12m-1-17 3 3-3 3M11 10l-3 3 3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>让本地模型运行起来</h3><p>通过内置 llama.cpp 服务加载 GGUF 模型。模型文件、GPU 层数、服务端口和多模态参数，均可在界面中配置。</p><span class="feature-note">运行状态与输出，清楚可见</span>
+        </article>
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 5h8v5a3 3 0 0 0 6 0V5h8v8h-5a3 3 0 0 0 0 6h5v8H5V5Z" stroke-linejoin="round"/></svg>
+          <h3>扩展能力，轻松管理</h3><p>查看、安装、更新和卸载实例插件，管理环境变量与运行时版本，让配置始终保持有序。</p><span class="feature-note">给每个实例独立的配置</span>
+        </article>
+        <article class="feature">
+          <svg class="feature-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 12a11 11 0 1 1-1 9M6 5v7h7M16 9v8l5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>备份与排查，更从容</h3><p>创建 zip 备份、恢复实例并重新安装依赖。遇到问题时，直接查看启动器和实例日志。</p><span class="feature-note">数据有备份，问题有线索</span>
         </article>
       </div>
     </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-header">
-          <h2>核心功能</h2>
-          <p class="desc">从初始化配置到生产运维，提供完整的一站式管理能力</p>
-        </div>
-        <div class="grid-3">
-          <article class="card">
-            <h3>引导式上手</h3>
-            <p>六步完成初始化：依赖安装、实例创建、模型配置、频道配置、启动实例、打开 WebUI。</p>
-          </article>
-          <article class="card">
-            <h3>实例管理</h3>
-            <p>创建 / 启动 / 停止 / 删除，支持更新前自动备份、打开实例目录和 CLI。</p>
-          </article>
-          <article class="card">
-            <h3>运行时管理</h3>
-            <p>管理 OpenClaw / Node.js（必需）与 Python / uv（可选）版本，支持下载和默认切换。</p>
-          </article>
-          <article class="card">
-            <h3>频道配置</h3>
-            <p>按实例维护 Discord、Telegram、Feishu、DingTalk、QQ 等参数，保存前支持停机检查。</p>
-          </article>
-          <article class="card">
-            <h3>模型与 LlamaCPP</h3>
-            <p>本地 GGUF 推理服务 + 在线/本地提供商切换（OpenAI、DeepSeek、Moonshot、Ollama、Llama.cpp）。</p>
-          </article>
-          <article class="card">
-            <h3>插件与备份</h3>
-            <p>插件安装/卸载、推荐插件一键安装；zip 备份与恢复后自动尝试重装依赖。</p>
-          </article>
-        </div>
+    <section class="start-section" id="start" aria-labelledby="start-title">
+      <div class="container section">
+        <div class="section-heading"><div><p class="eyebrow">快速开始</p><h2 id="start-title">三步，开始你的 OpenClaw。</h2></div><a class="text-link" href="https://github.com/shinnpuru/OpenClawLauncher/wiki">阅读完整指南 <span aria-hidden="true">↗</span></a></div>
+        <ol class="steps">
+          <li><span class="step-number" aria-hidden="true">01</span><h3>下载并打开</h3><p>选择适合系统的压缩包并解压。macOS 将应用移入“应用程序”；Windows 打开启动器。</p></li>
+          <li><span class="step-number" aria-hidden="true">02</span><h3>一键安装并启动</h3><p>进入“快速上手”，点击一键按钮。启动器会准备所需运行时，创建默认实例并启动。</p></li>
+          <li><span class="step-number" aria-hidden="true">03</span><h3>连接模型与频道</h3><p>填写模型服务配置，连接需要的聊天频道，再打开 WebUI，开始使用你的 OpenClaw。</p></li>
+        </ol>
       </div>
     </section>
-
-    <section class="section-dark">
-      <div class="container">
-        <div class="section-header">
-          <h2>快速开始</h2>
-          <p class="desc">与 README 保持一致：下载 → 安装 → 进入快速上手面板</p>
+    <section class="download container section" id="download" aria-labelledby="download-title">
+      <div class="download-inner">
+        <p class="eyebrow">从你的桌面，开始</p><h2 id="download-title">准备好，让它运行起来。</h2><p class="download-description">下载 OpenClaw Launcher，<br class="mobile-break">把精力留给你真正想做的事。</p>
+        <div class="download-options">
+          <a class="download-option" href="https://github.com/shinnpuru/OpenClawLauncher/releases/latest">
+            <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M22.5 17.3c0-3 2.5-4.5 2.6-4.6-1.4-2.1-3.6-2.3-4.4-2.4-1.9-.2-3.7 1.1-4.7 1.1-1 0-2.6-1.1-4.2-1-2.2 0-4.3 1.3-5.5 3.3-2.3 4-.6 9.9 1.6 13.1 1.1 1.5 2.3 3.1 4 3 1.6-.1 2.2-1 4.2-1s2.6 1 4.3 1c1.8 0 2.9-1.5 3.9-3 1.3-1.8 1.8-3.6 1.8-3.7-.1 0-3.6-1.4-3.6-5.8ZM19.4 8.3c.9-1.1 1.5-2.7 1.3-4.3-1.4.1-3.1.9-4.1 2-1 1.1-1.7 2.7-1.5 4.2 1.6.1 3.2-.8 4.3-1.9Z"/></svg>
+            <span><strong>macOS</strong><small>Apple Silicon · arm64</small></span><span class="download-arrow" aria-hidden="true">↗</span>
+          </a>
+          <a class="download-option" href="https://github.com/shinnpuru/OpenClawLauncher/releases/latest">
+            <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="m3 6 11-1.5V15H3V6Zm13-1.8L29 2v13H16V4.2ZM3 17h11v10.5L3 26v-9Zm13 0h13v13l-13-2.2V17Z"/></svg>
+            <span><strong>Windows</strong><small>x64 · Vulkan / CUDA 12.4</small></span><span class="download-arrow" aria-hidden="true">↗</span>
+          </a>
         </div>
-        <div class="grid-2">
-          <article class="card">
-            <h3>1) 下载与安装</h3>
-            <ol class="ol">
-              <li>进入 Releases 下载适配系统的安装包（macOS / Windows）</li>
-              <li>macOS 将 .app 放入"应用程序"；Windows 直接运行 .exe</li>
-              <li>首次启动建议进入"快速上手"面板</li>
-            </ol>
-          </article>
-          <article class="card">
-            <h3>2) 初始化配置</h3>
-            <ol class="ol">
-              <li>先确认 Node.js / OpenClaw 依赖状态，然后创建实例</li>
-              <li>在"LlamaCPP + 模型切换"完成本地或在线模型配置</li>
-              <li>配置频道后运行实例，在日志与备份面板做运行保障</li>
-            </ol>
-          </article>
-        </div>
+        <p class="download-note">选择系统后，在 GitHub Releases 下载对应安装包。<br><a href="https://github.com/shinnpuru/OpenClawLauncher/releases">所有版本与更新记录 <span aria-hidden="true">↗</span></a></p>
       </div>
     </section>
-
-    <section class="section">
-      <div class="container">
-        <div class="section-header">
-          <h2>面板截图</h2>
-          <p class="desc">直观的图形界面，覆盖完整的运维管理场景</p>
-        </div>
-        <div class="shot-grid">
-          <article class="shot">
-            <img src="./assets/onboard.png" alt="快速上手" loading="lazy" />
-            <p>快速上手</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/channels.png" alt="频道配置" loading="lazy" />
-            <p>频道配置</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/llamacpp.png" alt="LlamaCPP" loading="lazy" />
-            <p>LlamaCPP</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/models.png" alt="模型切换" loading="lazy" />
-            <p>模型切换</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/instance.png" alt="实例管理" loading="lazy" />
-            <p>实例管理</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/env.png" alt="依赖检查" loading="lazy" />
-            <p>依赖检查</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/backup.png" alt="备份管理" loading="lazy" />
-            <p>备份管理</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/log.png" alt="日志查看" loading="lazy" />
-            <p>日志查看</p>
-          </article>
-          <article class="shot">
-            <img src="./assets/plugin.png" alt="插件管理" loading="lazy" />
-            <p>插件管理</p>
-          </article>
-        </div>
+    <section class="faq container section" aria-labelledby="faq-title">
+      <div class="faq-heading"><p class="eyebrow">常见问题</p><h2 id="faq-title">再了解一点。</h2></div>
+      <div class="faq-list">
+        <details><summary>OpenClaw Launcher 和 OpenClaw 有什么区别？<span aria-hidden="true">+</span></summary><p>OpenClaw 是 AI 助手项目；OpenClaw Launcher 是帮助你安装、配置和运行它的桌面应用。启动器提供图形界面，把运行时准备、模型配置和日常管理集中到一起。<a href="https://github.com/openclaw/openclaw">了解 OpenClaw ↗</a></p></details>
+        <details><summary>需要提前安装 Python 或 Node.js 吗？<span aria-hidden="true">+</span></summary><p>使用发布版安装包，无需先准备 Python 开发环境。“快速上手”会安装所需 Node.js 和 OpenClaw 运行时。首次初始化需要网络连接。</p></details>
+        <details><summary>可以使用本地模型吗？<span aria-hidden="true">+</span></summary><p>可以。你可以连接 Ollama，或在 LlamaCPP 面板中加载 GGUF 模型并启动本地服务。本地推理需要与你的模型相匹配的内存和硬件；也可以选择在线模型提供商。</p></details>
+        <details><summary>软件免费吗？模型服务也免费吗？<span aria-hidden="true">+</span></summary><p>启动器以 MIT 协议免费开源。在线模型提供商可能按各自规则收取 API 费用；使用本地模型则需要自己准备模型文件和运行硬件。</p></details>
       </div>
     </section>
   </main>
-
-  <footer>
-    <div class="container">
-      OpenClaw Launcher &copy; Shinnpuru 2026
-    </div>
+  <footer class="footer container">
+    <div class="footer-top"><a class="brand" href="#"><img src="./assets/logo.png" alt="" width="28" height="28"><span>OpenClaw <span class="brand-light">Launcher</span></span></a><p>让复杂的开始，变得简单。</p></div>
+    <div class="footer-bottom"><p>© 2026 Shinnpuru <span aria-hidden="true">·</span> MIT License</p><nav aria-label="页脚导航"><a href="https://github.com/shinnpuru/OpenClawLauncher">GitHub ↗</a><a href="https://github.com/shinnpuru/OpenClawLauncher/wiki">使用文档 ↗</a><a href="https://github.com/shinnpuru/OpenClawLauncher/issues">反馈问题 ↗</a></nav><a href="#" class="back-top">回到顶部 ↑</a></div>
   </footer>
+  <dialog id="image-dialog" aria-label="应用界面大图">
+    <form method="dialog"><button class="dialog-close" aria-label="关闭大图">关闭 <span aria-hidden="true">×</span></button></form>
+    <img id="dialog-image" alt=""><p id="dialog-caption"></p>
+  </dialog>
 </body>
 </html>
