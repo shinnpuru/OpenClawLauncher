@@ -31,9 +31,9 @@ jobs:
           - os: windows-latest
             platform: windows-cuda
             llama_target: win-cuda-12.4-x64
-          # - os: macos-latest
-          #   platform: macos
-          #   llama_target: macos-arm64
+          - os: macos-latest
+            platform: macos
+            llama_target: macos-arm64
 
     steps:
       - name: Checkout
