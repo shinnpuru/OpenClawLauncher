@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
   <title>OpenClaw Launcher — 让 OpenClaw，轻松在桌面运行</title>
-  <meta name="description" content="OpenClaw Launcher 是免费开源的 OpenClaw 桌面启动器。一键安装与启动，连接聊天频道，配置在线或本地模型，管理插件、日志和备份。支持 Windows。">
+  <meta name="description" content="OpenClaw Launcher 是免费开源的 OpenClaw 桌面启动器。一键安装与启动，连接聊天频道，配置在线或本地模型，管理插件、日志和备份。支持 macOS 与 Windows。">
   <meta property="og:type" content="website">
   <meta property="og:title" content="OpenClaw Launcher — 让 OpenClaw，轻松在桌面运行">
-  <meta property="og:description" content="从安装、配置到日常管理，把 OpenClaw 的复杂步骤交给一个桌面应用。免费开源，支持 Windows。">
+  <meta property="og:description" content="从安装、配置到日常管理，把 OpenClaw 的复杂步骤交给一个桌面应用。免费开源，支持 macOS 与 Windows。">
   <meta property="og:url" content="https://openclaw.shinnpuru.site/">
   <meta property="og:image" content="https://openclaw.shinnpuru.site/assets/models.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -43,7 +43,7 @@
         <a class="button" href="https://github.com/shinnpuru/OpenClawLauncher/releases/latest">免费下载 <span aria-hidden="true">↓</span></a>
         <a class="text-link" href="https://github.com/shinnpuru/OpenClawLauncher">在 GitHub 上查看 <span aria-hidden="true">↗</span></a>
       </div>
-      <p class="hero-meta">Windows <span aria-hidden="true">·</span> 免费开源 <span aria-hidden="true">·</span> MIT License</p>
+      <p class="hero-meta">macOS & Windows <span aria-hidden="true">·</span> 免费开源 <span aria-hidden="true">·</span> MIT License</p>
     </section>
     <section class="showcase container" id="interface" aria-labelledby="interface-title">
       <div class="section-heading showcase-heading">
@@ -108,7 +108,7 @@
       <div class="container section">
         <div class="section-heading"><div><p class="eyebrow">快速开始</p><h2 id="start-title">三步，开始你的 OpenClaw。</h2></div><a class="text-link" href="https://github.com/shinnpuru/OpenClawLauncher/wiki">阅读完整指南 <span aria-hidden="true">↗</span></a></div>
         <ol class="steps">
-          <li><span class="step-number" aria-hidden="true">01</span><h3>下载并打开</h3><p>下载 Windows 安装包并解压，然后打开启动器。</p></li>
+          <li><span class="step-number" aria-hidden="true">01</span><h3>下载并打开</h3><p>下载对应系统的安装包并解压。macOS 将 .app 移入“应用程序”（Applications）；Windows 打开启动器。</p></li>
           <li><span class="step-number" aria-hidden="true">02</span><h3>一键安装并启动</h3><p>进入“快速上手”，点击一键按钮。启动器会准备所需运行时，创建默认实例并启动。</p></li>
           <li><span class="step-number" aria-hidden="true">03</span><h3>连接模型与频道</h3><p>填写模型服务配置，连接需要的聊天频道，再打开 WebUI，开始使用你的 OpenClaw。</p></li>
         </ol>
@@ -119,6 +119,7 @@
       <div class="faq-list">
         <details><summary>OpenClaw Launcher 和 OpenClaw 有什么区别？<span aria-hidden="true">+</span></summary><p>OpenClaw 是 AI 助手项目；OpenClaw Launcher 是帮助你安装、配置和运行它的桌面应用。启动器提供图形界面，把运行时准备、模型配置和日常管理集中到一起。<a href="https://github.com/openclaw/openclaw">了解 OpenClaw ↗</a></p></details>
         <details><summary>需要提前安装 Python 或 Node.js 吗？<span aria-hidden="true">+</span></summary><p>使用发布版安装包，无需先准备 Python 开发环境。“快速上手”会安装所需 Node.js 和 OpenClaw 运行时。首次初始化需要网络连接。</p></details>
+        <details><summary>macOS 上打不开应用怎么办？<span aria-hidden="true">+</span></summary><p>请先解压下载的安装包，将 openclaw-launcher.app 移入“应用程序”（Applications，/Applications）文件夹，再从该文件夹中打开应用。</p></details>
         <details><summary>可以使用本地模型吗？<span aria-hidden="true">+</span></summary><p>可以。你可以连接 Ollama，或在 LlamaCPP 面板中加载 GGUF 模型并启动本地服务。本地推理需要与你的模型相匹配的内存和硬件；也可以选择在线模型提供商。</p></details>
         <details><summary>软件免费吗？模型服务也免费吗？<span aria-hidden="true">+</span></summary><p>启动器以 MIT 协议免费开源。在线模型提供商可能按各自规则收取 API 费用；使用本地模型则需要自己准备模型文件和运行硬件。</p></details>
       </div>
