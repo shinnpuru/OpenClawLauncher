@@ -8,7 +8,7 @@ An independent product introduction inspired by the clarity and restraint of Ope
 - System sans-serif fonts with native Chinese fallbacks. No remote fonts or dependencies.
 - Large, medium-weight headings; generous whitespace; concise, concrete Chinese copy.
 - Pill buttons for actions and preview tabs. Minimal framing, with a neutral stage for product screenshots.
-- Six capabilities on a simple three-column grid, three setup steps, a dark download section, and common questions.
+- Six capabilities on a simple three-column grid, three setup steps and common questions. Download buttons link directly to the latest release page.
 - Responsive desktop, tablet and phone layouts. Visible focus, keyboard-operable tabs, native disclosures and dialog, and reduced-motion support.
 
 ## Content and maintenance
