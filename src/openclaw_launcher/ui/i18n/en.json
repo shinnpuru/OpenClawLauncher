@@ -426,5 +426,7 @@
     "model_switch_test_no_models": "API connection successful, but no model information found",
     "model_switch_test_failed": "API test failed: {error}",
     "model_switch_success": "✅ Model switch successful! Configuration updated and instance is now stopped.",
-    "model_switch_error": "❌ Model switch failed: {error}"
+    "model_switch_error": "❌ Model switch failed: {error}",
+    "msg_plugin_list_loading": "Loading installed plugins…",
+    "msg_plugin_list_failed": "Failed to load plugins: {error}"
 }

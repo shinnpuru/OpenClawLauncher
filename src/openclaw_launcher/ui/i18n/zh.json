@@ -427,5 +427,7 @@
     "model_switch_test_no_models": "API 连接成功，但未找到模型信息",
     "model_switch_test_failed": "API 测试失败: {error}",
     "model_switch_success": "✅ 模型切换成功！配置已更新，实例当前为已停止状态。",
-    "model_switch_error": "❌ 模型切换失败: {error}"
+    "model_switch_error": "❌ 模型切换失败: {error}",
+    "msg_plugin_list_loading": "正在读取已安装插件…",
+    "msg_plugin_list_failed": "读取插件列表失败：{error}"
 }

@@ -23,7 +23,27 @@ from PySide6.QtWidgets import (
 from ...core.config import Config
 from ...core.install_manager import InstallManager
 from ...core.process_manager import ProcessManager
+from ...core.plugin_manager import list_installed_plugins
 from ..i18n import i18n
+
+
+class PluginListWorker(QThread):
+    completed = Signal(str, list)
+    error = Signal(str, str)
+
+    def __init__(self, instance_path: Path, instance_name: str, parent=None):
+        super().__init__(parent)
+        self.instance_path = instance_path
+        self.instance_name = instance_name
+
+    def run(self):
+        try:
+            self.completed.emit(
+                self.instance_name,
+                list_installed_plugins(self.instance_path, self.instance_name),
+            )
+        except Exception as error:
+            self.error.emit(self.instance_name, str(error))
 
 
 class PluginInstallWorker(QThread):
@@ -120,12 +140,14 @@ class PluginUninstallWorker(QThread):
         instance_name: str,
         plugin_name: str,
         plugin_path: Path,
+        plugin_id: str,
     ):
         super().__init__()
         self.openclaw_home = openclaw_home
         self.instance_name = instance_name
         self.plugin_name = plugin_name
         self.plugin_path = plugin_path
+        self.plugin_id = plugin_id
 
     def run(self):
         log_file_path = Config.get_log_file(self.instance_name)
@@ -155,7 +177,8 @@ class PluginUninstallWorker(QThread):
                     "openclaw.mjs",
                     "plugins",
                     "uninstall",
-                    self.plugin_name,
+                    self.plugin_id,
+                    "--force",
                 ]
                 log_file.write(f"cwd: {self.openclaw_home}\n")
                 log_file.write(f"command: {' '.join(command)}\n")
@@ -165,6 +188,7 @@ class PluginUninstallWorker(QThread):
                     command,
                     cwd=str(self.openclaw_home),
                     env=env,
+                    stdin=subprocess.DEVNULL,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
@@ -294,6 +318,9 @@ class PluginPanel(QWidget):
         self.install_worker = None
         self.uninstall_worker = None
         self.update_worker = None
+        self.list_worker = None
+        self._refresh_pending = False
+        self._is_shutting_down = False
 
         self.main_layout = QVBoxLayout(self)
         
@@ -386,61 +413,6 @@ class PluginPanel(QWidget):
 
         return False
 
-    def _get_installed_plugins(self, instance_path: Path) -> list:
-        plugins_by_id = {}
-        projects_dir = instance_path / ".openclaw" / "npm" / "projects"
-        if not projects_dir.exists() or not projects_dir.is_dir():
-            return []
-
-        try:
-            for proj_dir in projects_dir.iterdir():
-                if not proj_dir.is_dir():
-                    continue
-                pkg_json = proj_dir / "package.json"
-                if not pkg_json.exists():
-                    continue
-                try:
-                    data = json.loads(pkg_json.read_text(encoding="utf-8"))
-                    deps = data.get("dependencies", {})
-                    if not isinstance(deps, dict):
-                        continue
-                    for d_name, d_version in deps.items():
-                        plugin_root = proj_dir / "node_modules" / Path(*d_name.split("/"))
-                        manifest_path = plugin_root / "openclaw.plugin.json"
-                        package_path = plugin_root / "package.json"
-                        if not manifest_path.exists() or not package_path.exists():
-                            continue
-
-                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                        package_data = json.loads(package_path.read_text(encoding="utf-8"))
-                        plugin_id = str(manifest.get("id", "")).strip()
-                        if not plugin_id:
-                            continue
-
-                        version = str(package_data.get("version") or d_version)
-                        candidate = {
-                            "id": plugin_id,
-                            "name": d_name,
-                            "version": version,
-                            "path": proj_dir,
-                            "sort_key": (
-                                "__openclaw-generation__" in proj_dir.name,
-                                proj_dir.stat().st_mtime_ns,
-                            ),
-                        }
-                        existing = plugins_by_id.get(plugin_id)
-                        if existing is None or candidate["sort_key"] > existing["sort_key"]:
-                            plugins_by_id[plugin_id] = candidate
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        plugins = list(plugins_by_id.values())
-        for plugin in plugins:
-            plugin.pop("sort_key", None)
-        return plugins
-
     def _load_instances(self, selected_name: str | None = None):
         self.instance_selector.blockSignals(True)
         self.instance_selector.clear()
@@ -490,6 +462,8 @@ class PluginPanel(QWidget):
         raise FileNotFoundError(i18n.t("msg_openclaw_home_not_found"))
 
     def refresh_plugins(self):
+        if self._is_shutting_down:
+            return
         self.plugin_tree.clear()
         self.plugin_tree.setHeaderLabels([
             i18n.t("col_plugin_name"),
@@ -508,7 +482,34 @@ class PluginPanel(QWidget):
             self.status_label.setText(i18n.t("msg_instance_not_found"))
             return
 
-        installed_plugins = self._get_installed_plugins(instance_path)
+        if self.list_worker is not None:
+            self._refresh_pending = True
+            return
+        self._refresh_pending = False
+        self.status_label.setText(i18n.t("msg_plugin_list_loading"))
+        worker = PluginListWorker(instance_path, selected_name, self)
+        self.list_worker = worker
+        worker.completed.connect(self._on_plugins_loaded)
+        worker.error.connect(self._on_plugin_list_error)
+        worker.finished.connect(self._cleanup_list_worker)
+        worker.start()
+
+    def _cleanup_list_worker(self):
+        worker = self.list_worker
+        self.list_worker = None
+        if worker is not None:
+            worker.deleteLater()
+        if self._refresh_pending:
+            self.refresh_plugins()
+
+    def _on_plugin_list_error(self, instance_name: str, error: str):
+        if instance_name == self.instance_selector.currentData() and not self._refresh_pending:
+            self.status_label.setText(i18n.t("msg_plugin_list_failed", error=error))
+
+    def _on_plugins_loaded(self, instance_name: str, installed_plugins: list):
+        if instance_name != self.instance_selector.currentData() or self._refresh_pending:
+            return
+        self.plugin_tree.clear()
         if not installed_plugins:
             empty_item = QTreeWidgetItem([i18n.t("status_empty"), "", ""])
             self.plugin_tree.addTopLevelItem(empty_item)
@@ -547,7 +548,7 @@ class PluginPanel(QWidget):
 
         uninstall_button = QPushButton(i18n.t("btn_uninstall"))
         uninstall_button.clicked.connect(
-            lambda checked=False, name=plugin_name, path=plugin_path: self.uninstall_plugin(name, path)
+            lambda checked=False, name=plugin_name, path=plugin_path, plugin=plugin_id: self.uninstall_plugin(name, path, plugin)
         )
         layout.addWidget(uninstall_button)
 
@@ -634,7 +635,7 @@ class PluginPanel(QWidget):
         )
         self.refresh_plugins()
 
-    def uninstall_plugin(self, plugin_name: str, plugin_path: Path):
+    def uninstall_plugin(self, plugin_name: str, plugin_path: Path, plugin_id: str):
         if self.uninstall_worker:
             QMessageBox.warning(self, i18n.t("title_warning"), i18n.t("msg_plugin_uninstall_busy"))
             return
@@ -686,6 +687,7 @@ class PluginPanel(QWidget):
             instance_name=instance_name,
             plugin_name=plugin_name,
             plugin_path=plugin_path,
+            plugin_id=plugin_id,
         )
         try:
             worker.setParent(self)
@@ -716,19 +718,11 @@ class PluginPanel(QWidget):
 
     def on_uninstall_error(self, plugin_name: str, error_msg: str, plugin_path_str: str):
         self._set_uninstalling_state(False)
-
-        plugin_path = Path(plugin_path_str)
-        if plugin_path.exists():
-            self._show_manual_cleanup_dialog(
-                plugin_path,
-                i18n.t("msg_uninstall_manual_cleanup_hint", name=plugin_name, path=str(plugin_path), error=error_msg),
-            )
-        else:
-            QMessageBox.critical(
-                self,
-                i18n.t("title_error"),
-                i18n.t("msg_uninstall_failed", name=plugin_name, error=error_msg),
-            )
+        QMessageBox.critical(
+            self,
+            i18n.t("title_error"),
+            i18n.t("msg_uninstall_failed", name=plugin_name, error=error_msg),
+        )
 
         self.status_label.setText(i18n.t("title_warning"))
         self.refresh_plugins()
@@ -855,6 +849,7 @@ class PluginPanel(QWidget):
             return
         self.install_worker = None
         worker.deleteLater()
+        self._update_install_controls_state()
 
     def _cleanup_uninstall_worker(self):
         worker = self.uninstall_worker
@@ -862,6 +857,7 @@ class PluginPanel(QWidget):
             return
         self.uninstall_worker = None
         worker.deleteLater()
+        self._update_install_controls_state()
 
     def _cleanup_update_worker(self):
         worker = self.update_worker
@@ -869,6 +865,7 @@ class PluginPanel(QWidget):
             return
         self.update_worker = None
         worker.deleteLater()
+        self._update_install_controls_state()
 
     def _apply_plugin_default_channel_config(self, plugin_name: str):
         normalized = plugin_name.strip().lower()
@@ -999,6 +996,14 @@ class PluginPanel(QWidget):
         self.refresh_plugins()
 
     def shutdown(self):
+        self._is_shutting_down = True
+        self._refresh_pending = False
+        list_worker = self.list_worker
+        if list_worker and list_worker.isRunning():
+            # Registry reads have a 30-second subprocess timeout. Let the child
+            # finish before Qt destroys its thread during application exit.
+            list_worker.wait(35000)
+
         worker = self.install_worker
         if worker and worker.isRunning():
             worker.requestInterruption()

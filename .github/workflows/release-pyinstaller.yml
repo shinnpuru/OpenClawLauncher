@@ -56,6 +56,13 @@ jobs:
             uv sync --dev
           fi
 
+      - name: Run regression tests
+        shell: bash
+        env:
+          PYTHONPATH: src
+          QT_QPA_PLATFORM: offscreen
+        run: uv run python -m unittest discover -s tests -v
+
       - name: Prepare llama.cpp runtime
         shell: bash
         run: |
