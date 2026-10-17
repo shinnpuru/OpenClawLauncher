@@ -4,11 +4,8 @@
 
 <h1 align="center">OpenClaw Launcher</h1>
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)
-![Platforms](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-555)
-![License](https://img.shields.io/badge/License-MIT-blue)
-[![Build and Release PyInstaller](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml/badge.svg)](https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml)
+
+<div align=center><img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-555"/>   <img src="https://img.shields.io/badge/License-MIT-blue"/>   <img src="https://github.com/shinnpuru/OpenClawLauncher/actions/workflows/release-pyinstaller.yml/badge.svg"/></div>
 
 <p align="center">中文 | <a href="README.en.md">English</a></p>
 
